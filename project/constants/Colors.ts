@@ -18,3 +18,5 @@ export const Colors = {
     lightGray: '#A3A3A3',
   },
 } as const;
+
+export type ColorScheme = typeof Colors;
