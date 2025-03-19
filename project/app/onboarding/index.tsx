@@ -32,10 +32,26 @@ export default function Onboarding() {
     fitnessGoal: '',
     activityLevel: '',
   });
-  const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [errors, setErrors] = useState<Record<keyof FormData, string | undefined>>({
+    height: undefined,
+    weight: undefined,
+    targetWeight: undefined,
+    age: undefined,
+    dietType: undefined,
+    fitnessGoal: undefined,
+    activityLevel: undefined,
+  });
 
   const validateStep = () => {
-    const newErrors: Partial<FormData> = {};
+    const newErrors: Record<keyof FormData, string | undefined> = {
+      height: undefined,
+      weight: undefined,
+      targetWeight: undefined,
+      age: undefined,
+      dietType: undefined,
+      fitnessGoal: undefined,
+      activityLevel: undefined,
+    };
 
     switch (step) {
       case 1:

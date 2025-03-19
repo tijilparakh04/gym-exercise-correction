@@ -1,84 +1,211 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, useColorScheme } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { Colors } from '@/constants/Colors';
-import { Mail, Lock, User, ArrowLeft } from 'lucide-react-native';
+import { Mail, Lock, User, ArrowLeft, Eye, EyeOff, Camera, CircleAlert as AlertCircle } from 'lucide-react-native';
+
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 export default function SignUp() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const colorScheme = useColorScheme();
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: '',
+    profileImage: '',
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+    name: '',
+    profileImage: '',
+    general: '',
+  });
+
   const { signUp } = useAuth();
 
+  const validateForm = () => {
+    const newErrors = {
+      email: '',
+      password: '',
+      name: '',
+      profileImage: '',
+      general: '',
+    };
+
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (!PASSWORD_REGEX.test(formData.password)) {
+      newErrors.password = 'Password must contain at least 8 characters, including uppercase, lowercase, number, and special character';
+    }
+
+    if (!formData.name) {
+      newErrors.name = 'Name is required';
+    }
+
+    if (!formData.profileImage) {
+      newErrors.profileImage = 'Profile image is required';
+    }
+
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(error => error !== '');
+  };
+
+  const handleSignUp = async () => {
+    if (!validateForm()) return;
+
+    try {
+      await signUp(formData.email, formData.password, formData.name, formData.profileImage);
+    } catch (error) {
+      setErrors(prev => ({
+        ...prev,
+        general: error instanceof Error ? error.message : 'An error occurred during sign up',
+      }));
+    }
+  };
+
+  // For demo purposes, we'll use a random Unsplash avatar
+  const selectRandomAvatar = () => {
+    const avatarIds = [
+      'rDEOVtE7vOs',
+      'mEZ3PoFGs_k',
+      'QXevDflbl8A',
+      'O3ymvT7Wf9U',
+      'X6Uj51n5CE8',
+    ];
+    const randomId = avatarIds[Math.floor(Math.random() * avatarIds.length)];
+    setFormData(prev => ({
+      ...prev,
+      profileImage: `https://images.unsplash.com/photo-${randomId}?w=400`,
+    }));
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <ScrollView 
+      style={[styles.container, { backgroundColor: Colors.background.offWhite }]}
+      contentContainerStyle={styles.contentContainer}
+    >
       <TouchableOpacity
-        style={styles.backButton}
+        style={[styles.backButton, { backgroundColor: Colors.background.lightGray }]}
         onPress={() => router.back()}
       >
         <ArrowLeft size={24} color={Colors.secondary.charcoal} />
       </TouchableOpacity>
 
       <View style={styles.header}>
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Start your fitness journey today</Text>
+        <Text style={[styles.title, { color: Colors.secondary.charcoal }]}>Create Account</Text>
+        <Text style={[styles.subtitle, { color: Colors.background.lightGray }]}>
+          Start your fitness journey today
+        </Text>
       </View>
 
+      {errors.general ? (
+        <View style={styles.errorContainer}>
+          <AlertCircle size={20} color="white" />
+          <Text style={styles.errorText}>{errors.general}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.form}>
-        <View style={styles.inputContainer}>
-          <User size={20} color={Colors.secondary.charcoal} />
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name"
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-          />
+        <TouchableOpacity 
+          style={[styles.imageSelector, { backgroundColor: Colors.background.lightGray }]} 
+          onPress={selectRandomAvatar}
+        >
+          {formData.profileImage ? (
+            <Image 
+              source={{ uri: formData.profileImage }} 
+              style={styles.profileImage} 
+            />
+          ) : (
+            <Camera size={32} color={Colors.secondary.charcoal} />
+          )}
+          <Text style={[styles.imageSelectorText, { color: Colors.secondary.charcoal }]}>
+            {formData.profileImage ? 'Change Photo' : 'Add Photo'}
+          </Text>
+        </TouchableOpacity>
+        {errors.profileImage ? <Text style={styles.fieldError}>{errors.profileImage}</Text> : null}
+
+        <View>
+          <View style={[
+            styles.inputContainer,
+            { backgroundColor: Colors.background.lightGray },
+            errors.name && styles.inputError
+          ]}>
+            <User size={20} color={Colors.secondary.charcoal} />
+            <TextInput
+              style={[styles.input, { color: Colors.secondary.charcoal }]}
+              placeholder="Full Name"
+              placeholderTextColor={Colors.background.lightGray}
+              value={formData.name}
+              onChangeText={(value) => setFormData(prev => ({ ...prev, name: value }))}
+              autoCapitalize="words"
+            />
+          </View>
+          {errors.name ? <Text style={styles.fieldError}>{errors.name}</Text> : null}
         </View>
 
-        <View style={styles.inputContainer}>
-          <Mail size={20} color={Colors.secondary.charcoal} />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+        <View>
+          <View style={[
+            styles.inputContainer,
+            { backgroundColor: Colors.background.lightGray },
+            errors.email && styles.inputError
+          ]}>
+            <Mail size={20} color={Colors.secondary.charcoal} />
+            <TextInput
+              style={[styles.input, { color: Colors.secondary.charcoal }]}
+              placeholder="Email"
+              placeholderTextColor={Colors.background.lightGray}
+              value={formData.email}
+              onChangeText={(value) => setFormData(prev => ({ ...prev, email: value }))}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+          {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
         </View>
 
-        <View style={styles.inputContainer}>
-          <Lock size={20} color={Colors.secondary.charcoal} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+        <View>
+          <View style={[
+            styles.inputContainer,
+            { backgroundColor: Colors.background.lightGray },
+            errors.password && styles.inputError
+          ]}>
+            <Lock size={20} color={Colors.secondary.charcoal} />
+            <TextInput
+              style={[styles.input, { color: Colors.secondary.charcoal }]}
+              placeholder="Password"
+              placeholderTextColor={Colors.background.lightGray}
+              value={formData.password}
+              onChangeText={(value) => setFormData(prev => ({ ...prev, password: value }))}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              {showPassword ? (
+                <EyeOff size={20} color={Colors.secondary.charcoal} />
+              ) : (
+                <Eye size={20} color={Colors.secondary.charcoal} />
+              )}
+            </TouchableOpacity>
+          </View>
+          {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
         </View>
 
         <TouchableOpacity
-          style={styles.signUpButton}
-          onPress={() => signUp(email, password, name)}
+          style={[styles.signUpButton, { backgroundColor: Colors.primary.blue }]}
+          onPress={handleSignUp}
         >
           <Text style={styles.signUpButtonText}>Create Account</Text>
         </TouchableOpacity>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>By signing up, you agree to our</Text>
-          <View style={styles.footerLinks}>
-            <TouchableOpacity>
-              <Text style={styles.link}>Terms of Service</Text>
-            </TouchableOpacity>
-            <Text style={styles.footerText}> and </Text>
-            <TouchableOpacity>
-              <Text style={styles.link}>Privacy Policy</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
     </ScrollView>
   );
@@ -87,7 +214,6 @@ export default function SignUp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.offWhite,
   },
   contentContainer: {
     padding: 20,
@@ -97,53 +223,80 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   header: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   title: {
     fontFamily: 'Montserrat-Bold',
     fontSize: 32,
-    color: Colors.secondary.charcoal,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   subtitle: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: Colors.background.lightGray,
   },
   form: {
-    gap: 16,
+    gap: 20,
+  },
+  imageSelector: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    borderRadius: 16,
+    gap: 12,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  imageSelectorText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: Colors.accent.peach,
   },
   input: {
     flex: 1,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
   },
+  errorContainer: {
+    backgroundColor: Colors.accent.peach,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  errorText: {
+    color: 'white',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    flex: 1,
+  },
+  fieldError: {
+    color: Colors.accent.peach,
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
   signUpButton: {
-    backgroundColor: Colors.primary.blue,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -160,7 +313,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontFamily: 'Inter-Regular',
-    color: Colors.background.lightGray,
   },
   footerLinks: {
     flexDirection: 'row',
@@ -168,7 +320,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   link: {
-    color: Colors.primary.blue,
     fontFamily: 'Inter-SemiBold',
   },
 });

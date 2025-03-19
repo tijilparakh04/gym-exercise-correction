@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Settings, CreditCard as Edit2, Bell, Shield, LogOut, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 const profileSections = [
   {
@@ -22,8 +23,100 @@ const profileSections = [
 ];
 
 export default function ProfileScreen() {
-  const { signOut } = useAuth();
-  const [profileImage, setProfileImage] = useState('https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400');
+  const { signOut, user } = useAuth();
+  interface ProfileData {
+    id: string;
+    full_name?: string;
+    email?: string;
+    profile_image_url?: string;
+    age?: number;
+    height_cm?: number;
+    current_weight_kg?: number;
+    target_weight_kg?: number;
+    activity_level?: string;
+    diet_preference?: string;
+    fitness_goal?: string;
+  }
+
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [user]);
+
+  async function fetchUserProfile() {
+    if (!user?.id) return;
+    
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) throw error;
+      setProfileData(data);
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleImageUpload = async () => {
+    try {
+      setUploadingImage(true);
+      
+      // For demo purposes, we'll use a random Unsplash image
+      // In a real app, you would use expo-image-picker here
+      const imageUrls = [
+        'rDEOVtE7vOs',
+        'mEZ3PoFGs_k',
+        'QXevDflbl8A',
+        'O3ymvT7Wf9U',
+        'X6Uj51n5CE8',
+      ];
+      const randomId = imageUrls[Math.floor(Math.random() * imageUrls.length)];
+      const imageUrl = `https://images.unsplash.com/photo-${randomId}?w=400`;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ profile_image_url: imageUrl })
+        .eq('id', user?.id || '');
+
+      if (updateError) throw updateError;
+      
+      await fetchUserProfile();
+    } catch (err) {
+      console.error('Error uploading image:', err);
+      setError('Failed to update profile image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load profile</Text>
+        <Text style={styles.errorSubtext}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -33,14 +126,22 @@ export default function ProfileScreen() {
 
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: profileImage }}
+          source={{ uri: profileData?.profile_image_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400' }}
           style={styles.profileImage}
         />
-        <TouchableOpacity style={styles.editImageButton}>
-          <Edit2 size={20} color="white" />
+        <TouchableOpacity 
+          style={[styles.editImageButton, uploadingImage && styles.editImageButtonDisabled]}
+          onPress={handleImageUpload}
+          disabled={uploadingImage}
+        >
+          {uploadingImage ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Edit2 size={20} color="white" />
+          )}
         </TouchableOpacity>
-        <Text style={styles.name}>John Doe</Text>
-        <Text style={styles.email}>john.doe@example.com</Text>
+        <Text style={styles.name}>{profileData?.full_name || 'User'}</Text>
+        <Text style={styles.email}>{profileData?.email}</Text>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
@@ -56,6 +157,40 @@ export default function ProfileScreen() {
           <View style={styles.statItem}>
             <Text style={styles.statValue}>8.5k</Text>
             <Text style={styles.statLabel}>Points</Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.bioSection}>
+        <Text style={styles.sectionTitle}>Fitness Profile</Text>
+        <View style={styles.bioContent}>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Age</Text>
+            <Text style={styles.bioValue}>{profileData?.age} years</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Height</Text>
+            <Text style={styles.bioValue}>{profileData?.height_cm} cm</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Current Weight</Text>
+            <Text style={styles.bioValue}>{profileData?.current_weight_kg} kg</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Target Weight</Text>
+            <Text style={styles.bioValue}>{profileData?.target_weight_kg} kg</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Activity Level</Text>
+            <Text style={styles.bioValue}>{formatActivityLevel(profileData?.activity_level)}</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Diet</Text>
+            <Text style={styles.bioValue}>{formatDietPreference(profileData?.diet_preference)}</Text>
+          </View>
+          <View style={styles.bioRow}>
+            <Text style={styles.bioLabel}>Goal</Text>
+            <Text style={styles.bioValue}>{formatFitnessGoal(profileData?.fitness_goal)}</Text>
           </View>
         </View>
       </View>
@@ -88,10 +223,52 @@ export default function ProfileScreen() {
   );
 }
 
+function formatActivityLevel(level: string | undefined) {
+  if (!level) return 'Not set';
+  return level.charAt(0).toUpperCase() + level.slice(1).replace('_', ' ');
+}
+
+function formatDietPreference(preference: string | undefined) {
+  if (!preference) return 'Not set';
+  return preference.charAt(0).toUpperCase() + preference.slice(1).replace('_', ' ');
+}
+
+function formatFitnessGoal(goal: string | undefined) {
+  if (!goal) return 'Not set';
+  return goal.charAt(0).toUpperCase() + goal.slice(1).replace('_', ' ');
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.offWhite,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background.offWhite,
+  },
+  loadingText: {
+    fontFamily: 'Inter-Regular',
+    marginTop: 10,
+    color: Colors.secondary.charcoal,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background.offWhite,
+  },
+  errorText: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 18,
+    color: Colors.accent.peach,
+  },
+  errorSubtext: {
+    fontFamily: 'Inter-Regular',
+    color: Colors.secondary.charcoal,
+    marginTop: 8,
   },
   header: {
     padding: 20,
@@ -125,6 +302,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 3,
     borderColor: Colors.background.offWhite,
+  },
+  editImageButtonDisabled: {
+    opacity: 0.7,
   },
   name: {
     fontFamily: 'Montserrat-Bold',
@@ -163,6 +343,31 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
     color: Colors.background.lightGray,
+  },
+  bioSection: {
+    padding: 20,
+  },
+  bioContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+  },
+  bioRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.background.softGray,
+  },
+  bioLabel: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
+    color: Colors.background.lightGray,
+  },
+  bioValue: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: Colors.secondary.charcoal,
   },
   section: {
     padding: 20,

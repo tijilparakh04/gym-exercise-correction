@@ -3,12 +3,54 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'reac
 import { Link } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { Colors } from '@/constants/Colors';
-import { Mail, Lock, ArrowRight } from 'lucide-react-native';
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react-native';
+
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn, signInWithGoogle } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({
+    email: '',
+    password: '',
+    general: '',
+  });
+  const { signIn } = useAuth();
+
+  const validateForm = () => {
+    const newErrors = {
+      email: '',
+      password: '',
+      general: '',
+    };
+
+    if (!email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = 'Please enter a valid email';
+    }
+
+    if (!password) {
+      newErrors.password = 'Password is required';
+    }
+
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(error => error !== '');
+  };
+
+  const handleSignIn = async () => {
+    if (!validateForm()) return;
+
+    try {
+      await signIn(email, password);
+    } catch (error: any) {
+      setErrors(prev => ({
+        ...prev,
+        general: error.message || 'An error occurred during sign in',
+      }));
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -22,46 +64,62 @@ export default function SignIn() {
       </View>
 
       <View style={styles.form}>
-        <View style={styles.inputContainer}>
-          <Mail size={20} color={Colors.secondary.charcoal} />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+        {errors.general ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errors.general}</Text>
+          </View>
+        ) : null}
+
+        <View>
+          <View style={[
+            styles.inputContainer,
+            errors.email && styles.inputError
+          ]}>
+            <Mail size={20} color={Colors.secondary.charcoal} />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={Colors.background.lightGray}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+          {errors.email ? <Text style={styles.fieldError}>{errors.email}</Text> : null}
         </View>
 
-        <View style={styles.inputContainer}>
-          <Lock size={20} color={Colors.secondary.charcoal} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+        <View>
+          <View style={[
+            styles.inputContainer,
+            errors.password && styles.inputError
+          ]}>
+            <Lock size={20} color={Colors.secondary.charcoal} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={Colors.background.lightGray}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              {showPassword ? (
+                <EyeOff size={20} color={Colors.secondary.charcoal} />
+              ) : (
+                <Eye size={20} color={Colors.secondary.charcoal} />
+              )}
+            </TouchableOpacity>
+          </View>
+          {errors.password ? <Text style={styles.fieldError}>{errors.password}</Text> : null}
         </View>
 
         <TouchableOpacity
           style={styles.signInButton}
-          onPress={() => signIn(email, password)}
+          onPress={handleSignIn}
         >
           <Text style={styles.signInButtonText}>Sign In</Text>
           <ArrowRight size={20} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.googleButton}
-          onPress={signInWithGoogle}
-        >
-          <Image
-            source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg' }}
-            style={styles.googleIcon}
-          />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -78,8 +136,8 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.offWhite,
     padding: 20,
+    backgroundColor: Colors.background.offWhite,
   },
   header: {
     alignItems: 'center',
@@ -107,26 +165,42 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
   },
+  errorContainer: {
+    backgroundColor: Colors.accent.peach,
+    padding: 12,
+    borderRadius: 8,
+  },
+  errorText: {
+    color: 'white',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'white',
+  },
+  inputError: {
+    borderWidth: 1,
+    borderColor: Colors.accent.peach,
   },
   input: {
     flex: 1,
     fontFamily: 'Inter-Regular',
     fontSize: 16,
+    color: Colors.secondary.charcoal,
+  },
+  fieldError: {
+    color: Colors.accent.peach,
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
   signInButton: {
-    backgroundColor: Colors.primary.blue,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
@@ -134,34 +208,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     marginTop: 8,
+    backgroundColor: Colors.primary.blue,
   },
   signInButtonText: {
     color: 'white',
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  googleIcon: {
-    width: 24,
-    height: 24,
-  },
-  googleButtonText: {
-    color: Colors.secondary.charcoal,
-    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
   },
   footer: {
@@ -179,7 +230,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   signUpText: {
-    color: Colors.primary.blue,
     fontFamily: 'Inter-SemiBold',
+    color: Colors.primary.blue,
   },
 });
