@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { Link } from 'expo-router';
-import { useAuth } from '@/providers/AuthProvider';
+import { Link, router } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';  // Updated import path
 import { Colors } from '@/constants/Colors';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react-native';
 
@@ -44,6 +44,7 @@ export default function SignIn() {
 
     try {
       await signIn(email, password);
+      router.replace('/(tabs)');
     } catch (error: any) {
       setErrors(prev => ({
         ...prev,

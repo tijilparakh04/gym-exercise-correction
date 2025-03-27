@@ -1,24 +1,48 @@
 {
   "expo": {
-    "name": "bolt-expo-nativewind",
+    "name": "gymm",
     "slug": "bolt-expo-nativewind",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "myapp", 
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "tijilparakh04",
     "ios": {
       "supportsTablet": true
+    },
+    "android": {
+      "package": "com.udisha.gymm",
+      "config": {
+        "googleSignIn": {
+          "apiKey": "604282748092-7gkf403qvckfsn1jh154darek97oedq2.apps.googleusercontent.com",
+          "certificateHash": "5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25"
+        }
+      }
+      
     },
     "web": {
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "@react-native-google-signin/google-signin",
+      "expo-build-properties"
+    ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c6a5a283-ca53-408a-b306-4537f2772d42"
+      }
     }
+    
   }
 }

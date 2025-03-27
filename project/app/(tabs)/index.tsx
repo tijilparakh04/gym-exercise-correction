@@ -45,7 +45,7 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Today's Diet Plan</Text>
-          <Link href="/diet" style={styles.sectionLink}>
+          <Link href="./diet" style={styles.sectionLink}>
             <Text style={styles.sectionLinkText}>View All</Text>
           </Link>
         </View>

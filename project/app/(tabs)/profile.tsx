@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Settings, CreditCard as Edit2, Bell, Shield, LogOut, ChevronRight } from 'lucide-react-native';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/context/AuthContext'; // Updated import path
 import { supabase } from '@/lib/supabase';
+import { router } from 'expo-router';
 
 const profileSections = [
   {
@@ -117,7 +118,18 @@ export default function ProfileScreen() {
       </View>
     );
   }
-
+  const getImageUrl = (path: string | undefined) => {
+    if (!path) return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    
+    // If it's already a full URL (like from Unsplash), return it directly
+    if (path.startsWith('http')) {
+      return path;
+    }
+    
+    // Otherwise, construct the Supabase storage URL
+    const { data } = supabase.storage.from('user_images').getPublicUrl(path);
+    return data?.publicUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+  };
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -125,8 +137,11 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.profileSection}>
+        {/* Image component for profile picture */}
         <Image
-          source={{ uri: profileData?.profile_image_url || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400' }}
+          source={{ 
+            uri: getImageUrl(profileData?.profile_image_url),
+          }}
           style={styles.profileImage}
         />
         <TouchableOpacity 
@@ -202,7 +217,16 @@ export default function ProfileScreen() {
             {section.items.map((item, itemIndex) => {
               const Icon = item.icon;
               return (
-                <TouchableOpacity key={itemIndex} style={styles.menuItem}>
+                <TouchableOpacity 
+                  key={itemIndex} 
+                  style={styles.menuItem}
+                  onPress={() => {
+                    // Fix the navigation path to use the correct format
+                    if (item.label === 'Edit Profile') {
+                      router.push('/profile/edit');
+                    }
+                  }}
+                >
                   <View style={styles.menuItemLeft}>
                     <Icon size={20} color={Colors.secondary.charcoal} />
                     <Text style={styles.menuItemText}>{item.label}</Text>
@@ -215,7 +239,18 @@ export default function ProfileScreen() {
         </View>
       ))}
 
-      <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+      <TouchableOpacity 
+        style={styles.logoutButton} 
+        onPress={async () => {
+          try {
+            await signOut();
+            // Navigate to the auth screen instead of root
+            router.replace('/(auth)');
+          } catch (error) {
+            console.error('Error signing out:', error);
+          }
+        }}
+      >
         <LogOut size={20} color={Colors.accent.peach} />
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
