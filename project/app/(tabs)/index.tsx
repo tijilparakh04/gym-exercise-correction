@@ -45,20 +45,35 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Today's Diet Plan</Text>
-          <Link href="./diet" style={styles.sectionLink}>
-            <Text style={styles.sectionLinkText}>View All</Text>
+          <Link href="/diet" asChild>
+            <TouchableOpacity style={styles.editButton}>
+              <Text style={styles.editButtonText}>Edit/Create</Text>
+            </TouchableOpacity>
           </Link>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mealContainer}>
-          {['Breakfast', 'Lunch', 'Dinner'].map((meal) => (
-            <View key={meal} style={styles.mealCard}>
-              <Image
-                source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }}
-                style={styles.mealImage}
-              />
-              <Text style={styles.mealTitle}>{meal}</Text>
-              <Text style={styles.mealTime}>9:00 AM</Text>
-            </View>
+          {[
+            { name: 'Breakfast', time: '9:00 AM' },
+            { name: 'Lunch', time: '2:00 PM' },
+            { name: 'Dinner', time: '8:00 PM' }
+          ].map((meal) => (
+            <Link 
+              href={{
+                pathname: '/meal/[type]',
+                params: { type: meal.name.toLowerCase() }
+              }} 
+              key={meal.name} 
+              asChild
+            >
+              <TouchableOpacity style={styles.mealCard}>
+                <Image
+                  source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }}
+                  style={styles.mealImage}
+                />
+                <Text style={styles.mealTitle}>{meal.name}</Text>
+                <Text style={styles.mealTime}>{meal.time}</Text>
+              </TouchableOpacity>
+            </Link>
           ))}
         </ScrollView>
       </View>
@@ -248,5 +263,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 12,
     color: Colors.background.lightGray,
+  },
+  // Add these missing styles
+  editButton: {
+    backgroundColor: Colors.primary.blue,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  editButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: 'white',
   },
 });
