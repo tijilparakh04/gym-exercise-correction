@@ -126,9 +126,16 @@ export default function ProfileScreen() {
       return path;
     }
     
-    // Otherwise, construct the Supabase storage URL
-    const { data } = supabase.storage.from('user_images').getPublicUrl(path);
-    return data?.publicUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    // Otherwise, construct the Supabase storage URL with a fresh token
+    try {
+      const { data } = supabase.storage
+        .from('user_images')
+        .getPublicUrl(path);
+      return data?.publicUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    } catch (error) {
+      console.error('Error getting public URL:', error);
+      return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    }
   };
   return (
     <ScrollView style={styles.container}>

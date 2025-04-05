@@ -1,20 +1,104 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Link } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Play, TrendingUp, Clock, ChevronRight } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const [profile, setProfile] = useState({
+    full_name: 'Fitness User',
+    profile_image_url: null
+  });
+  const [profileImageUrl, setProfileImageUrl] = useState('https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400');
+  const [hasSnacks, setHasSnacks] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+      checkForSnacks();
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, profile_image_url')
+        .eq('id', user?.id)
+        .single();
+        
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+      
+      if (data) {
+        setProfile({
+          full_name: data.full_name || 'Fitness User',
+          profile_image_url: data.profile_image_url
+        });
+        
+        // If profile image URL exists
+        if (data.profile_image_url) {
+          // If it's already a full URL (like from Unsplash), use it directly
+          if (data.profile_image_url.startsWith('http')) {
+            setProfileImageUrl(data.profile_image_url);
+          } else {
+            // Otherwise, get the public URL from Supabase storage
+            try {
+              const { data: publicUrlData } = supabase.storage
+                .from('user_images')
+                .getPublicUrl(data.profile_image_url);
+                
+              if (publicUrlData && publicUrlData.publicUrl) {
+                console.log('Generated image URL:', publicUrlData.publicUrl);
+                setProfileImageUrl(publicUrlData.publicUrl);
+              }
+            } catch (urlError) {
+              console.error('Error getting image URL:', urlError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+    }
+  };
+
+  const checkForSnacks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('diet_plans')
+        .select('snacks_food')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking for snacks:', error);
+        return;
+      }
+      
+      setHasSnacks(data?.snacks_food ? true : false);
+    } catch (error) {
+      console.error('Error in checkForSnacks:', error);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400' }}
+          source={{ uri: profileImageUrl }}
           style={styles.profileImage}
         />
         <View>
           <Text style={styles.greeting}>Welcome back,</Text>
-          <Text style={styles.name}>John Doe</Text>
+          <Text style={styles.name}>{profile.full_name}</Text>
         </View>
       </View>
 
@@ -51,11 +135,12 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </Link>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mealContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mealContainer} contentContainerStyle={styles.mealContentContainer}>
           {[
-            { name: 'Breakfast', time: '9:00 AM' },
-            { name: 'Lunch', time: '2:00 PM' },
-            { name: 'Dinner', time: '8:00 PM' }
+            { name: 'Breakfast', time: '9:00 AM', image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400' },
+            { name: 'Lunch', time: '2:00 PM', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' },
+            { name: 'Dinner', time: '8:00 PM', image: 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400' },
+            ...(hasSnacks ? [{ name: 'Snacks', time: 'Throughout the day', image: 'https://images.unsplash.com/photo-1576506295286-5cda18df43e7?w=400' }] : [])
           ].map((meal) => (
             <Link 
               href={{
@@ -67,7 +152,7 @@ export default function HomeScreen() {
             >
               <TouchableOpacity style={styles.mealCard}>
                 <Image
-                  source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }}
+                  source={{ uri: meal.image }}
                   style={styles.mealImage}
                 />
                 <Text style={styles.mealTitle}>{meal.name}</Text>
@@ -206,6 +291,9 @@ const styles = StyleSheet.create({
   },
   mealContainer: {
     paddingLeft: 20,
+  },
+  mealContentContainer: {
+    paddingRight: 20, // Add padding to the right to prevent the last card from being cut off
   },
   mealCard: {
     backgroundColor: 'white',

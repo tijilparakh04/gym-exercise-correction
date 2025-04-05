@@ -64,7 +64,29 @@ function generateMockDietPlan(preferences, profileData) {
         carbs: 70,
         fat: 25
       }
-    }
+    },
+    snacks: [
+      {
+        food: isVegetarian 
+          ? "Apple slices with 2 tablespoons of almond butter"
+          : "Protein shake with 1 scoop whey protein and 1 cup almond milk",
+        calories: 200,
+        macros: {
+          protein: isHighProtein ? 15 : 10,
+          carbs: 20,
+          fat: 10
+        }
+      },
+      {
+        food: "Greek yogurt with a handful of mixed nuts and berries",
+        calories: 250,
+        macros: {
+          protein: 15,
+          carbs: 15,
+          fat: 15
+        }
+      }
+    ]
   };
 }
 
@@ -91,7 +113,7 @@ router.post('/generate', async (req, res) => {
 - Fitness goal: ${profileData?.fitness_goal || 'Not specified'}
 - Additional preferences: ${preferences || 'None'}
 
-Please provide a diet plan with breakfast, lunch, and dinner. For each meal, include:
+Please provide a diet plan with breakfast, lunch, dinner, and 1-2 snacks. For each meal and snack, include:
 1. A detailed description of the food
 2. Total calories
 3. Macronutrients (protein, carbs, fat) in grams
@@ -124,10 +146,21 @@ Format the response as a JSON object with the following structure:
       "carbs": 45,
       "fat": 20
     }
-  }
+  },
+  "snacks": [
+    {
+      "food": "Description of snack 1",
+      "calories": 200,
+      "macros": {
+        "protein": 15,
+        "carbs": 20,
+        "fat": 5
+      }
+    }
+  ]
 }
 
-Only respond with the JSON object, no additional text.`;
+IMPORTANT: Only respond with the JSON object exactly as shown above. Do not include any additional fields like "totals" or any text outside the JSON. The snacks field must be an array even if there's only one snack.`;
 
       console.log('Sending prompt to Gemini:', prompt);
       
@@ -173,6 +206,16 @@ Only respond with the JSON object, no additional text.`;
         if (jsonMatch) {
           console.log('JSON match found:', jsonMatch[0]);
           dietPlan = JSON.parse(jsonMatch[0]);
+          
+          // Ensure snacks is always an array
+          if (dietPlan.snacks && !Array.isArray(dietPlan.snacks)) {
+            dietPlan.snacks = [dietPlan.snacks];
+          }
+          
+          // Remove any totals field if present
+          if (dietPlan.totals) {
+            delete dietPlan.totals;
+          }
         } else {
           console.error('No valid JSON found in response');
           throw new Error('No valid JSON found in response');

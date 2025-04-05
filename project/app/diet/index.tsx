@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { Colors } from '@/constants/Colors';
 import { ArrowLeft, RefreshCw, Plus } from 'lucide-react-native';
+import api from '@/lib/api';
 
 interface MacroNutrients {
   protein: number;
@@ -25,6 +26,19 @@ interface MealData {
   food: string;
   calories: number;
   macros: MacroNutrients;
+}
+
+interface SnackData {
+  food: string;
+  calories: number;
+  macros: MacroNutrients;
+}
+
+interface DietPlanResponse {
+  breakfast: MealData;
+  lunch: MealData;
+  dinner: MealData;
+  snacks?: SnackData[];
 }
 
 interface DietPlan {
@@ -48,6 +62,11 @@ interface DietPlan {
   dinner_protein: number;
   dinner_carbs: number;
   dinner_fat: number;
+  snacks_food?: string;
+  snacks_calories?: number;
+  snacks_protein?: number;
+  snacks_carbs?: number;
+  snacks_fat?: number;
 }
 
 export default function DietPlanScreen() {
@@ -97,8 +116,6 @@ export default function DietPlanScreen() {
     try {
       setRefreshing(true);
       
-      // In a real app, you would call your backend API here
-      // For demo purposes, we'll simulate an API call with a timeout
       const response = await generateDietPlanFromOpenAI(preferences);
       
       if (!response) {
@@ -106,7 +123,26 @@ export default function DietPlanScreen() {
         return;
       }
       
-      const { breakfast, lunch, dinner } = response;
+      const { breakfast, lunch, dinner, snacks } = response;
+      
+      // Prepare snacks data if available
+      let snacksFood = '';
+      let snacksCalories = 0;
+      let snacksProtein = 0;
+      let snacksCarbs = 0;
+      let snacksFat = 0;
+      
+      if (snacks && Array.isArray(snacks) && snacks.length > 0) {
+        snacksFood = snacks.map(snack => 
+          `${snack.food} (${snack.calories} cal, P:${snack.macros.protein}g, C:${snack.macros.carbs}g, F:${snack.macros.fat}g)`
+        ).join('\n\n');
+        
+        // Calculate totals
+        snacksCalories = snacks.reduce((total, snack) => total + snack.calories, 0);
+        snacksProtein = snacks.reduce((total, snack) => total + snack.macros.protein, 0);
+        snacksCarbs = snacks.reduce((total, snack) => total + snack.macros.carbs, 0);
+        snacksFat = snacks.reduce((total, snack) => total + snack.macros.fat, 0);
+      }
       
       const { data, error } = await supabase
         .from('diet_plans')
@@ -127,7 +163,12 @@ export default function DietPlanScreen() {
           dinner_calories: dinner.calories,
           dinner_protein: dinner.macros.protein,
           dinner_carbs: dinner.macros.carbs,
-          dinner_fat: dinner.macros.fat
+          dinner_fat: dinner.macros.fat,
+          snacks_food: snacksFood || null,
+          snacks_calories: snacksCalories || null,
+          snacks_protein: snacksProtein || null,
+          snacks_carbs: snacksCarbs || null,
+          snacks_fat: snacksFat || null
         })
         .select()
         .single();
@@ -157,31 +198,46 @@ export default function DietPlanScreen() {
         .select('*')
         .eq('id', user?.id)
         .single();
-
+  
       console.log('Profile data:', profileData);
+      console.log('Attempting to call API at:', api.defaults.baseURL);
       
-      // Call your backend API
-      console.log('Calling API at: http://192.168.1.15:5000/api/diet-plan/generate');
-      const response = await fetch('http://192.168.1.15:5000/api/diet-plan/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Call your backend API using axios
+      try {
+        const response = await api.post('/api/diet-plan/generate', {
           preferences: userPreferences,
           profileData,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API response error:', response.status, errorText);
-        throw new Error(`Failed to generate diet plan: ${response.status} ${errorText}`);
+        });
+  
+        console.log('API response data:', response.data);
+        return response.data;
+      } catch (apiError: any) {
+        console.error('API response error:', apiError.response?.status, apiError.response?.data || apiError.message);
+        
+        // For testing on phone, return mock data if API fails
+        if (__DEV__) {
+          console.log('Returning mock data for development');
+          return {
+            breakfast: {
+              food: "Oatmeal with berries and nuts",
+              calories: 350,
+              macros: { protein: 12, carbs: 45, fat: 15 }
+            },
+            lunch: {
+              food: "Grilled chicken salad with avocado",
+              calories: 450,
+              macros: { protein: 35, carbs: 20, fat: 25 }
+            },
+            dinner: {
+              food: "Baked salmon with roasted vegetables",
+              calories: 500,
+              macros: { protein: 30, carbs: 25, fat: 30 }
+            }
+          };
+        }
+        
+        throw new Error(`Failed to generate diet plan: ${apiError.message}`);
       }
-
-      const data = await response.json();
-      console.log('API response data:', data);
-      return data;
     } catch (error) {
       console.error('Error calling diet plan API:', error);
       return null;
@@ -305,30 +361,41 @@ export default function DietPlanScreen() {
             dietPlan.dinner_fat
           )}
           
+          {dietPlan.snacks_food && (
+            renderMealCard(
+              'Snacks', 
+              dietPlan.snacks_food, 
+              dietPlan.snacks_calories || 0, 
+              dietPlan.snacks_protein || 0, 
+              dietPlan.snacks_carbs || 0, 
+              dietPlan.snacks_fat || 0
+            )
+          )}
+          
           <View style={styles.totalContainer}>
             <Text style={styles.totalTitle}>Daily Total</Text>
             <View style={styles.macrosContainer}>
               <View style={styles.macroItem}>
                 <Text style={styles.totalValue}>
-                  {dietPlan.breakfast_calories + dietPlan.lunch_calories + dietPlan.dinner_calories}
+                  {dietPlan.breakfast_calories + dietPlan.lunch_calories + dietPlan.dinner_calories + (dietPlan.snacks_calories || 0)}
                 </Text>
                 <Text style={styles.macroLabel}>Calories</Text>
               </View>
               <View style={styles.macroItem}>
                 <Text style={styles.totalValue}>
-                  {dietPlan.breakfast_protein + dietPlan.lunch_protein + dietPlan.dinner_protein}g
+                  {dietPlan.breakfast_protein + dietPlan.lunch_protein + dietPlan.dinner_protein + (dietPlan.snacks_protein || 0)}g
                 </Text>
                 <Text style={styles.macroLabel}>Protein</Text>
               </View>
               <View style={styles.macroItem}>
                 <Text style={styles.totalValue}>
-                  {dietPlan.breakfast_carbs + dietPlan.lunch_carbs + dietPlan.dinner_carbs}g
+                  {dietPlan.breakfast_carbs + dietPlan.lunch_carbs + dietPlan.dinner_carbs + (dietPlan.snacks_carbs || 0)}g
                 </Text>
                 <Text style={styles.macroLabel}>Carbs</Text>
               </View>
               <View style={styles.macroItem}>
                 <Text style={styles.totalValue}>
-                  {dietPlan.breakfast_fat + dietPlan.lunch_fat + dietPlan.dinner_fat}g
+                  {dietPlan.breakfast_fat + dietPlan.lunch_fat + dietPlan.dinner_fat + (dietPlan.snacks_fat || 0)}g
                 </Text>
                 <Text style={styles.macroLabel}>Fat</Text>
               </View>

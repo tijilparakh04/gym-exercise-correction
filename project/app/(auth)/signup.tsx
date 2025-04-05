@@ -251,7 +251,7 @@ export default function SignUp() {
           email: formData.email,
           options: {
             // Set to false to prevent automatic user creation
-            shouldCreateUser: false,
+            shouldCreateUser: true,
           },
         });
         
@@ -398,32 +398,18 @@ export default function SignUp() {
           }
           
           console.log('Upload successful, getting public URL...');
-          const { data: publicUrlData } = supabase.storage
-            .from('user_images')
-            .getPublicUrl(filePath);
-            
-          console.log('Public URL data:', publicUrlData);
           
-          if (publicUrlData && publicUrlData.publicUrl) {
-            console.log('Public URL obtained:', publicUrlData.publicUrl);
-            
-            // Continue using the local image for display but save the public URL for database
-            // This ensures we can see the image in the UI while still saving the correct URL
-            const publicUrl = publicUrlData.publicUrl;
-            
-            // Store both the local URI (for display) and the public URL (for database)
-            setFormData(prev => ({ 
-              ...prev, 
-              // Keep using local URI for display
-              profileImage: file.uri,
-              // Store the public URL in a hidden field for database storage
-              profileImageUrl: publicUrl 
-            }));
-          } else {
-            console.error('Failed to get public URL, data:', publicUrlData);
-            // Keep using the local image
-            Alert.alert('URL Warning', 'Using local image. It may not be saved permanently.');
-          }
+          // Store just the file path in the database, not the full URL with token
+          setFormData(prev => ({ 
+            ...prev, 
+            // Keep using local URI for display
+            profileImage: file.uri,
+            // Store just the file path for database storage
+            profileImageUrl: filePath 
+          }));
+          
+          console.log('Image path stored for database:', filePath);
+          
         } catch (error) {
           console.error('Upload error:', error);
           // Keep using the local image but show an alert
@@ -488,7 +474,8 @@ export default function SignUp() {
         height: formData.height_cm,
         weight: formData.current_weight_kg,
         target: formData.target_weight_kg,
-        goal: formData.fitness_goal
+        goal: formData.fitness_goal,
+        profileImagePath: formData.profileImageUrl
       });
       
       // Check if we have a valid user ID
@@ -506,7 +493,7 @@ export default function SignUp() {
           email: formData.email || session?.user?.email,
           full_name: formData.name,
           phone: formData.phone,
-          profile_image_url: formData.profileImageUrl || formData.profileImage,
+          profile_image_url: formData.profileImageUrl,
           age: parseInt(formData.age),
           height_cm: parseFloat(formData.height_cm),
           current_weight_kg: parseFloat(formData.current_weight_kg),

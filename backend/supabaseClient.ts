@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { config } from './config';
 
-dotenv.config(); // Load environment variables
+if (!config.supabase.url || !config.supabase.serviceKey) {
+  console.error('Missing Supabase credentials in environment variables');
+  process.exit(1);
+}
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+export const supabase = createClient(
+  config.supabase.url,
+  config.supabase.serviceKey
+);

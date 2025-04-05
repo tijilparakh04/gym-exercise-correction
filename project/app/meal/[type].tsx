@@ -31,14 +31,16 @@ export default function MealDetailScreen() {
   const mealTimes = {
     breakfast: '9:00 AM',
     lunch: '2:00 PM',
-    dinner: '8:00 PM'
+    dinner: '8:00 PM',
+    snacks: 'Throughout the day'
   };
   
   // Map meal type to image
   const mealImages = {
     breakfast: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400',
     lunch: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
-    dinner: 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400'
+    dinner: 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400',
+    snacks: 'https://images.unsplash.com/photo-1576506295286-5cda18df43e7?w=400'
   };
 
   useEffect(() => {
