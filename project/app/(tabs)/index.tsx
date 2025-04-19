@@ -106,25 +106,12 @@ export default function HomeScreen() {
         <View style={styles.startWorkoutContent}>
           <Play size={24} color="white" />
           <View style={styles.startWorkoutText}>
-            <Text style={styles.startWorkoutTitle}>Start Workout</Text>
+            <Text style={styles.startWorkoutTitle}>Check form in Real Time!</Text>
             <Text style={styles.startWorkoutSubtitle}>Continue your fitness journey</Text>
           </View>
         </View>
         <ChevronRight size={24} color="white" />
       </TouchableOpacity>
-
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <TrendingUp size={20} color={Colors.primary.blue} />
-          <Text style={styles.statValue}>75%</Text>
-          <Text style={styles.statLabel}>Weekly Goal</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Clock size={20} color={Colors.primary.green} />
-          <Text style={styles.statValue}>12.5h</Text>
-          <Text style={styles.statLabel}>Total Time</Text>
-        </View>
-      </View>
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
