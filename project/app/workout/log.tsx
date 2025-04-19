@@ -4,7 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, Save, Clock, Dumbbell, CheckCircle2, X } from 'lucide-react-native';
+import { ArrowLeft, Save, Clock, Dumbbell, CheckCircle2, X, Flame } from 'lucide-react-native';
 
 export default function LogWorkoutScreen() {
   const { user } = useAuth();
@@ -26,10 +26,25 @@ export default function LogWorkoutScreen() {
   }>>([]);
   const [duration, setDuration] = useState('45');
   const [notes, setNotes] = useState('');
+  // Add calories state
+  const [calories, setCalories] = useState('0');
+  const [workoutName, setWorkoutName] = useState('');
 
   useEffect(() => {
     if (workoutId) {
       fetchWorkoutDetails();
+    } else {
+      // Initialize with default values if no workout ID
+      setExercises([{
+        name: '',
+        sets: Array.from({ length: 3 }, () => ({
+          reps: '10',
+          weight: '',
+          completed: false
+        })),
+        notes: ''
+      }]);
+      setLoading(false);
     }
   }, [workoutId]);
 
@@ -166,56 +181,61 @@ export default function LogWorkoutScreen() {
         total + ex.sets.filter(set => set.completed).length, 0);
       
       const completionPercentage = totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
-      const isFullyCompleted = completionPercentage === 100;
       
-      // Update the workout
-      const { error: workoutError } = await supabase
-        .from('workouts')
-        .update({
+      // First create or update the workout if needed
+      let workoutToUse = workoutId;
+      
+      if (!workoutId) {
+        // Create a new workout if we don't have an ID
+        const { data: newWorkout, error: createError } = await supabase
+          .from('workouts')
+          .insert({
+            name: workoutName ,
+            user_id: user?.id,
+            duration_minutes: parseInt(duration) || 45,
+            notes: notes,
+          })
+          .select()
+          .single();
+          
+        if (createError) throw createError;
+        workoutToUse = newWorkout.id;
+      }
+      
+      // Now create the completed workout entry
+      const { data: completedWorkout, error: completedError } = await supabase
+        .from('completed_workouts')
+        .insert({
+          workout_id: workoutToUse,
+          user_id: user?.id,
           duration_minutes: parseInt(duration) || 45,
+          calories_burned: parseInt(calories) || 0,
           notes: notes,
-          completed_at: isFullyCompleted ? new Date().toISOString() : null,
-          completion_percentage: Math.round(completionPercentage),
-          updated_at: new Date().toISOString()
+          workout_name: workoutName || (workout?.name ) // Use the workout_name column
         })
-        .eq('id', workoutId);
+        .select()
+        .single();
         
-      if (workoutError) throw workoutError;
+      if (completedError) throw completedError;
       
-      // Delete existing exercises
-      const { error: deleteError } = await supabase
-        .from('workout_exercises')
-        .delete()
-        .eq('workout_id', workoutId);
-        
-      if (deleteError) throw deleteError;
-      
-      // Insert updated exercises
+      // Save the exercises for this completed workout
       const exercisesToInsert = exercises.map(ex => ({
-        workout_id: workoutId,
+        completed_workout_id: completedWorkout.id,
         exercise_name: ex.name,
-        sets: ex.sets.length,
-        reps: parseInt(ex.sets[0]?.reps) || 10,
-        weight_kg: parseFloat(ex.sets[0]?.weight) || null,
-        notes: ex.notes,
-        completed_sets: ex.sets.filter(set => set.completed).length
+        sets_data: ex.sets,
+        notes: ex.notes
       }));
       
       const { error: exercisesError } = await supabase
-        .from('workout_exercises')
+        .from('completed_workout_exercises')
         .insert(exercisesToInsert);
         
       if (exercisesError) throw exercisesError;
       
-      // Save detailed set data to a separate table if needed
-      // This would be useful for tracking progress over time
-      
       Alert.alert(
         'Success', 
-        isFullyCompleted 
-          ? 'Workout completed and saved successfully!' 
-          : 'Workout progress saved successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
+        'Workout logged successfully!',
+        [{ text: 'OK', onPress: () => router.replace('/(tabs)/workout') }]
       );
     } catch (error) {
       console.error('Error saving workout:', error);
@@ -225,7 +245,7 @@ export default function LogWorkoutScreen() {
     }
   };
 
-  if (loading) {
+  if (loading && workoutId) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary.blue} />
@@ -261,19 +281,40 @@ export default function LogWorkoutScreen() {
       
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.workoutName}>{workout.name}</Text>
+          <TextInput
+            style={styles.workoutNameInput}
+            value={workoutName || (workout?.name)}
+            onChangeText={setWorkoutName}
+            placeholder="Workout Name"
+            placeholderTextColor={Colors.background.lightGray}
+          />
           
-          <View style={styles.durationContainer}>
-            <Clock size={20} color={Colors.primary.blue} />
-            <TextInput
-              style={styles.durationInput}
-              value={duration}
-              onChangeText={setDuration}
-              placeholder="Duration (minutes)"
-              placeholderTextColor={Colors.background.lightGray}
-              keyboardType="number-pad"
-            />
-            <Text style={styles.durationLabel}>minutes</Text>
+          <View style={styles.metricRow}>
+            <View style={styles.metricContainer}>
+              <Clock size={20} color={Colors.primary.blue} />
+              <TextInput
+                style={styles.metricInput}
+                value={duration}
+                onChangeText={setDuration}
+                placeholder="45"
+                placeholderTextColor={Colors.background.lightGray}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.metricLabel}>minutes</Text>
+            </View>
+            
+            <View style={styles.metricContainer}>
+              <Flame size={20} color={Colors.accent.peach} />
+              <TextInput
+                style={styles.metricInput}
+                value={calories}
+                onChangeText={setCalories}
+                placeholder="0"
+                placeholderTextColor={Colors.background.lightGray}
+                keyboardType="number-pad"
+              />
+              <Text style={styles.metricLabel}>calories</Text>
+            </View>
           </View>
         </View>
         
@@ -399,6 +440,20 @@ export default function LogWorkoutScreen() {
             numberOfLines={4}
           />
         </View>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity 
+            style={styles.doneButton}
+            onPress={handleSaveWorkout}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text style={styles.doneButtonText}>Done</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        
       </ScrollView>
     </View>
   );
@@ -408,6 +463,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.offWhite,
+  },
+  buttonContainer: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  doneButton: {
+    backgroundColor: Colors.primary.blue,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: 'white',
   },
   scrollView: {
     flex: 1,
@@ -429,17 +500,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.background.offWhite,
   },
-  workoutName: {
+  workoutNameInput: {
     fontFamily: 'Montserrat-Bold',
     fontSize: 24,
     color: Colors.secondary.charcoal,
     marginBottom: 16,
   },
-  durationContainer: {
+  metricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  metricContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 16,
   },
-  durationInput: {
+  metricInput: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
     color: Colors.secondary.charcoal,
@@ -450,7 +527,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.background.lightGray,
   },
-  durationLabel: {
+  metricLabel: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: Colors.background.lightGray,

@@ -34,10 +34,12 @@ interface TodaysWorkout {
 
 interface RecentWorkout {
   id: string;
+  workoutId?: string;  // Add workoutId property
   name: string;
   duration: string;
   calories: string;
   date: string;
+  completedWorkoutId?: string; // Add completedWorkoutId property
 }
 
 
@@ -199,15 +201,30 @@ export default function WorkoutScreen() {
         pathname: '/workout/edit-day',
         params: { dayId: todaysWorkout.planDay.id }
       });
+    } else {
+      // If no today's workout, navigate to log workout screen
+      router.push('/workout/log');
     }
   };
 
-  const handleViewWorkout = (workoutId: string) => {
-    router.push({
-      pathname: '/workout/details',
-      params: { id: workoutId }
-    });
+  // Add a function to handle logging a workout
+  const handleLogWorkout = () => {
+    router.push('/workout/log');
   };
+
+  const handleViewWorkout = (workoutId: string, completedWorkoutId?: string) => {
+      if (completedWorkoutId) {
+        router.push({
+          pathname: '/workout/completed',
+          params: { id: completedWorkoutId }
+        });
+      } else if (workoutId) {
+        router.push({
+          pathname: '/workout/details',
+          params: { id: workoutId }
+        });
+      }
+    };
 
   if (loading) {
     return (
@@ -298,7 +315,7 @@ export default function WorkoutScreen() {
         ) : workoutPlan ? (
           <TouchableOpacity 
             style={styles.createTodaysWorkoutCard}
-            onPress={handleEditTodaysWorkout}
+            onPress={handleLogWorkout}
           >
             <Plus size={24} color={Colors.primary.blue} />
             <Text style={styles.createTodaysWorkoutText}>Log Today's Workout</Text>
@@ -352,7 +369,7 @@ export default function WorkoutScreen() {
             <TouchableOpacity 
               key={index} 
               style={styles.recentCard}
-              onPress={() => handleViewWorkout(workout.id)}
+              onPress={() => handleViewWorkout(workout.workoutId || '', workout.completedWorkoutId)}
             >
               <View style={styles.recentInfo}>
                 <Text style={styles.recentTitle}>{workout.name}</Text>
