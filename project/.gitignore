@@ -26,7 +26,7 @@ yarn-error.*
 # macos
 .DS_Store
 *.pem
-
+*.env
 # local env files
 .env*.local
 C:\Users\Udisha\Documents\gymm\backend\.env
