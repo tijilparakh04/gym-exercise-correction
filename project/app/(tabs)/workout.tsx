@@ -40,11 +40,6 @@ interface RecentWorkout {
   date: string;
 }
 
-const workoutCategories = [
-  { name: 'Strength Training', icon: Dumbbell, color: Colors.primary.blue },
-  { name: 'Cardio', icon: Flame, color: Colors.accent.peach },
-  { name: 'HIIT', icon: Clock, color: Colors.primary.green },
-];
 
 export default function WorkoutScreen() {
   const { user } = useAuth();
@@ -227,34 +222,8 @@ export default function WorkoutScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Workouts</Text>
-        <Text style={styles.subtitle}>Choose your workout type</Text>
       </View>
 
-      <View style={styles.categories}>
-        {workoutCategories.map(({ name, icon: Icon, color }) => (
-          <TouchableOpacity
-            key={name}
-            style={[
-              styles.categoryCard,
-              selectedCategory === name && { backgroundColor: color },
-            ]}
-            onPress={() => setSelectedCategory(name)}
-          >
-            <Icon
-              size={24}
-              color={selectedCategory === name ? 'white' : color}
-            />
-            <Text
-              style={[
-                styles.categoryName,
-                selectedCategory === name && styles.categoryNameSelected,
-              ]}
-            >
-              {name}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
 
       {/* Workout Plan Section */}
       <View style={styles.section}>
@@ -332,7 +301,7 @@ export default function WorkoutScreen() {
             onPress={handleEditTodaysWorkout}
           >
             <Plus size={24} color={Colors.primary.blue} />
-            <Text style={styles.createTodaysWorkoutText}>Create Today's Workout</Text>
+            <Text style={styles.createTodaysWorkoutText}>Log Today's Workout</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.noWorkoutCard}>

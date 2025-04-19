@@ -42,7 +42,7 @@
         "projectId": "c6a5a283-ca53-408a-b306-4537f2772d42"
       },
       "apiUrl": "http://localhost:5000",
-      "devApiUrl": "http://192.168.1.15:5000"
+      "devApiUrl": "http://192.168.1.25:5000"
     }
   }
 }

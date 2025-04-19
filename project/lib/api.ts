@@ -22,9 +22,8 @@ if (__DEV__) {
   if (isPhysicalDevice) {
     console.log('Running on physical device, using IP address for API calls');
     // Using the specified IP address for testing on phone
-    api.defaults.baseURL = 'http://192.168.1.29:5000';
+    api.defaults.baseURL = process.env.EXPO_PUBLIC_API_URL || 'localhost://50000';
   }
-  
   console.log('API base URL:', api.defaults.baseURL);
 }
 
