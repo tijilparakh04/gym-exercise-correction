@@ -18,7 +18,7 @@ interface AnalysisResult {
 
 const EXERCISES = ['Bench Press', 'Squat', 'Deadlift'];
 const FRAMES_PER_SECOND = 5; // Number of frames to capture per second
-const SERVER_URL = 'http://192.168.1.25:5000'; // If testing on Android emulator
+const SERVER_URL = 'http://192.168.1.25:5050'; // If testing on Android emulator
 // const SERVER_URL = 'http://localhost:5000'; // If testing on iOS simulator
 // const SERVER_URL = 'http://your-server-ip:5000'; // If testing on physical device
 

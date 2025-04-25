@@ -14,11 +14,14 @@ export default function HomeScreen() {
   });
   const [profileImageUrl, setProfileImageUrl] = useState('https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400');
   const [hasSnacks, setHasSnacks] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
       fetchUserProfile();
       checkForSnacks();
+      fetchFriends();
     }
   }, [user]);
 
@@ -88,7 +91,77 @@ export default function HomeScreen() {
       console.error('Error in checkForSnacks:', error);
     }
   };
+  const fetchFriends = async () => {
+    try {
+      setFriendsLoading(true);
+      
+      // Fetch accepted friends where user is the requester
+      const { data: friendsData1, error: friendsError1 } = await supabase
+        .from('friend_connections')
+        .select(`
+          id,
+          friend:friend_id(id, full_name, profile_image_url)
+        `)
+        .eq('user_id', user?.id)
+        .eq('status', 'accepted');
 
+      if (friendsError1) throw friendsError1;
+      
+      // Fetch friends where user is the friend_id
+      const { data: friendsData2, error: friendsError2 } = await supabase
+        .from('friend_connections')
+        .select(`
+          id,
+          friend:user_id(id, full_name, profile_image_url)
+        `)
+        .eq('friend_id', user?.id)
+        .eq('status', 'accepted');
+
+      if (friendsError2) throw friendsError2;
+      
+      // Combine and format the friends data
+      const combinedFriends = [
+        ...(friendsData1 || []).map(item => ({
+          id: item.id,
+          ...item.friend,
+          activity: "Completed a 30min workout",
+          time: "1h ago"
+        })),
+        ...(friendsData2 || []).map(item => ({
+          id: item.id,
+          ...item.friend,
+          activity: "Logged a new diet plan",
+          time: "3h ago"
+        }))
+      ];
+      
+      setFriends(combinedFriends.slice(0, 2)); // Show only the first 2 friends
+      setFriendsLoading(false);
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+      setFriendsLoading(false);
+    }
+  };
+
+  const getImageUrl = (path: string | undefined) => {
+    if (!path) return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    
+    // If it's already a full URL (like from Unsplash), return it directly
+    if (path.startsWith('http')) {
+      return path;
+    }
+    
+    // Otherwise, construct the Supabase storage URL with a fresh token
+    try {
+      const { data } = supabase.storage
+        .from('user_images')
+        .getPublicUrl(path);
+      return data?.publicUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    } catch (error) {
+      console.error('Error getting public URL:', error);
+      return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    }
+  };
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -160,19 +233,39 @@ export default function HomeScreen() {
             <Text style={styles.sectionLinkText}>See All</Text>
           </Link>
         </View>
-        {[1, 2].map((i) => (
-          <View key={i} style={styles.activityCard}>
-            <Image
-              source={{ uri: `https://images.unsplash.com/photo-${i === 1 ? '1494790108377-be9c29b29330' : '1527980965255-d3b416303d12'}?w=400` }}
-              style={styles.activityUserImage}
-            />
-            <View style={styles.activityContent}>
-              <Text style={styles.activityName}>Sarah Johnson</Text>
-              <Text style={styles.activityText}>Completed a 45min workout</Text>
+        
+        {friendsLoading ? (
+          <View style={styles.loadingContainer}>
+            <View style={{ padding: 10 }}>
+              <Text>Loading...</Text>
             </View>
-            <Text style={styles.activityTime}>2h ago</Text>
           </View>
-        ))}
+        ) : friends.length > 0 ? (
+          friends.map((friend) => (
+            <View key={friend.id} style={styles.activityCard}>
+              <Image
+                source={{ 
+                  uri: getImageUrl(friend.profile_image_url || undefined)
+                }}
+                style={styles.activityUserImage}
+              />
+              <View style={styles.activityContent}>
+                <Text style={styles.activityName}>{friend.full_name}</Text>
+                <Text style={styles.activityText}>{friend.activity}</Text>
+              </View>
+              <Text style={styles.activityTime}>{friend.time}</Text>
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyFriendsContainer}>
+            <Text style={styles.emptyFriendsText}>No friends yet</Text>
+            <Link href="/social" asChild>
+              <TouchableOpacity style={styles.findFriendsButton}>
+                <Text style={styles.findFriendsText}>Find Friends</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -350,6 +443,36 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   editButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: 'white',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyFriendsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    borderRadius: 12,
+  },
+  emptyFriendsText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: Colors.background.lightGray,
+    marginBottom: 10,
+  },
+  findFriendsButton: {
+    backgroundColor: Colors.primary.blue,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  findFriendsText: {
     fontFamily: 'Inter-SemiBold',
     fontSize: 14,
     color: 'white',

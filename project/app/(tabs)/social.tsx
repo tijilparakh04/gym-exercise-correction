@@ -147,6 +147,26 @@ export default function SocialScreen() {
     }
   };
 
+  const getImageUrl = (path: string | undefined) => {
+    if (!path) return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    
+    // If it's already a full URL (like from Unsplash), return it directly
+    if (path.startsWith('http')) {
+      return path;
+    }
+    
+    // Otherwise, construct the Supabase storage URL with a fresh token
+    try {
+      const { data } = supabase.storage
+        .from('user_images')
+        .getPublicUrl(path);
+      return data?.publicUrl || 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    } catch (error) {
+      console.error('Error getting public URL:', error);
+      return 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400';
+    }
+  };
+
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
@@ -281,8 +301,7 @@ export default function SocialScreen() {
         <View style={styles.friendProfileCard}>
           <Image 
             source={{ 
-              uri: selectedFriend.profile_image_url || 
-                'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400'
+              uri: getImageUrl(selectedFriend.profile_image_url || undefined)
             }}
             style={styles.friendProfileImage}
             resizeMode="cover"
@@ -403,8 +422,7 @@ export default function SocialScreen() {
             <View key={profile.id} style={styles.userCard}>
               <Image 
                 source={{ 
-                  uri: profile.profile_image_url || 
-                    'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400'
+                  uri: getImageUrl(profile.profile_image_url || undefined)
                 }}
                 style={styles.userImage} 
               />
@@ -450,8 +468,7 @@ export default function SocialScreen() {
                 >
                   <Image 
                     source={{ 
-                      uri: friendData.profile_image_url || 
-                        'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400'
+                      uri: getImageUrl(friendData.profile_image_url || undefined)
                     }}
                     style={styles.userImage} 
                   />
@@ -480,8 +497,8 @@ export default function SocialScreen() {
                   <View key={request.id} style={styles.userCard}>
                     <Image 
                       source={{ 
-                        uri: requesterData.profile_image_url || 
-                          'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400'
+                        uri: getImageUrl(requesterData.profile_image_url || undefined)
+                          
                       }}
                       style={styles.userImage} 
                     />
@@ -520,8 +537,7 @@ export default function SocialScreen() {
                   <View key={request.id} style={styles.userCard}>
                     <Image 
                       source={{ 
-                        uri: friendData.profile_image_url || 
-                          'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400'
+                        uri: getImageUrl(friendData.profile_image_url || undefined)
                       }}
                       style={styles.userImage} 
                     />

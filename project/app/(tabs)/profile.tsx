@@ -10,17 +10,9 @@ const profileSections = [
   {
     title: 'Account',
     items: [
-      { icon: Edit2, label: 'Edit Profile', link: '/profile/edit' },
-      { icon: Bell, label: 'Notifications', link: '/profile/notifications' },
-      { icon: Shield, label: 'Privacy', link: '/profile/privacy' },
+      { icon: Edit2, label: 'Edit Profile', link: '/profile/edit' }
     ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { icon: Settings, label: 'App Settings', link: '/profile/settings' },
-    ],
-  },
+  }
 ];
 
 export default function ProfileScreen() {
