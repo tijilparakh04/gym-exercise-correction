@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { Play, TrendingUp, Clock, ChevronRight } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
@@ -102,7 +102,10 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.startWorkoutCard}>
+      <TouchableOpacity 
+        style={styles.startWorkoutCard}
+        onPress={() => router.push('./form-check/form-detection')}
+      >
         <View style={styles.startWorkoutContent}>
           <Play size={24} color="white" />
           <View style={styles.startWorkoutText}>
