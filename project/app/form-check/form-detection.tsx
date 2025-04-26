@@ -9,15 +9,16 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 // Define proper interface for server response
 interface AnalysisResult {
-  class_name: string;
+  class_name?: string;
   form_feedback?: string;
   feedback_type?: 'info' | 'error' | 'success';
   stage?: string;
   count_rep?: boolean;
+  feedback?: string; // New field for direct feedback messages
 }
 
 const EXERCISES = ['Bench Press', 'Squat', 'Deadlift'];
-const FRAMES_PER_SECOND = 5; // Number of frames to capture per second
+const FRAMES_PER_SECOND = 1; // Number of frames to capture per second
 const SERVER_URL = 'http://192.168.1.25:5050'; // If testing on Android emulator
 // const SERVER_URL = 'http://localhost:5000'; // If testing on iOS simulator
 // const SERVER_URL = 'http://your-server-ip:5000'; // If testing on physical device
@@ -123,8 +124,10 @@ export default function FormDetectionScreen() {
           const photo = await cameraRef.current.takePictureAsync({
             quality: 0.5,
             base64: true,
-            skipProcessing: true
-            
+            skipProcessing: true,
+            shutterSound: false,
+            animateShutter: false,
+            flash: 'off' 
           });
           
           await processCameraFrame(photo);
@@ -221,7 +224,19 @@ export default function FormDetectionScreen() {
   const processAnalysisResult = (result: AnalysisResult) => {
     if (!result) return;
     
-    // Extract values from result
+    // Check if we received a direct feedback message (new format)
+    if ('feedback' in result) {
+      setFeedback(result.feedback as string);
+      setFeedbackType('error'); // Assuming direct feedback is usually an error/warning
+      
+      // Clear feedback after 3 seconds
+      setTimeout(() => {
+        setFeedback('');
+      }, 3000);
+      return;
+    }
+    
+    // Extract values from result (original format)
     const { class_name, form_feedback, feedback_type, stage, count_rep } = result;
     
     console.log(`Server prediction: ${class_name}`);
