@@ -586,22 +586,6 @@ export default function SignUp() {
               </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.authMethodButton, authMethod === 'phone' && styles.selectedAuthMethod]} 
-              onPress={() => setAuthMethod('phone')}
-            >
-              <User size={20} color={authMethod === 'phone' ? Colors.primary.blue : Colors.secondary.charcoal} />
-              <Text style={authMethod === 'phone' ? styles.selectedAuthMethodText : styles.authMethodText}>
-                Phone
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.authMethodButton, styles.googleButton]} 
-              onPress={handleGoogleSignIn}
-            >
-              <Text style={styles.authMethodText}>Sign in with Google</Text>
-            </TouchableOpacity>
           </View>
 
           {authMethod === 'email' && (
