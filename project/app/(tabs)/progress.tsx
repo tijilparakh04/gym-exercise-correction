@@ -19,7 +19,7 @@ const weightData = {
   labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
   datasets: [
     {
-      data: [75, 74, 73, 72, 71, 70],
+      data: [60, 62, 62, 64, 65, 65],
       color: (opacity = 1) => `rgba(90, 156, 255, ${opacity})`,
       strokeWidth: 2,
     },
@@ -30,7 +30,7 @@ const strengthData = {
   labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
   datasets: [
     {
-      data: [50, 55, 60, 65, 70, 75],
+      data: [60, 65, 67,69,70,72],
       color: (opacity = 1) => `rgba(136, 192, 164, ${opacity})`,
       strokeWidth: 2,
     },
@@ -55,7 +55,7 @@ export default function ProgressScreen() {
           <Scale size={24} color="white" />
           <View>
             <Text style={styles.metricLabel}>Current Weight</Text>
-            <Text style={styles.metricValue}>70 kg</Text>
+            <Text style={styles.metricValue}>65 kg</Text>
           </View>
         </TouchableOpacity>
 
@@ -91,7 +91,7 @@ export default function ProgressScreen() {
           <Target size={24} color={Colors.primary.blue} />
           <View style={styles.goalInfo}>
             <Text style={styles.goalTitle}>Weight Goal</Text>
-            <Text style={styles.goalProgress}>68 kg (2 kg to go)</Text>
+            <Text style={styles.goalProgress}>75 kg (10 kg to go)</Text>
           </View>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: '80%' }]} />
@@ -113,7 +113,7 @@ export default function ProgressScreen() {
       <View style={styles.achievementsContainer}>
         <Text style={styles.sectionTitle}>Recent Achievements</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsList}>
-          {['Consistent Tracker', '5k Runner', 'Weight Goal'].map((achievement, index) => (
+          {['Consistent Tracker'].map((achievement, index) => (
             <View key={index} style={styles.achievementCard}>
               <View style={styles.achievementIcon}>
                 <TrendingUp size={24} color={Colors.primary.blue} />

@@ -105,8 +105,8 @@ export default function EditWorkoutDayScreen() {
       }
       
       // Call the backend API to generate a workout
-      console.log('Calling API at: http://192.168.1.25:5000/api/workout-plan/generate');
-      const response = await fetch('http://192.168.1.25:5000/api/workout-plan/generate', {
+      console.log('Calling API at: http://10.24.93.66:5000/api/workout-plan/generate');
+      const response = await fetch('http://10.24.93.66:5000/api/workout-plan/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
