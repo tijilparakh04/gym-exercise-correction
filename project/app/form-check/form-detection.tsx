@@ -6,6 +6,8 @@ import { Colors } from '@/constants/Colors';
 import { ChevronDown, X, Camera, RotateCcw } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import tts from './tts';
+import { Audio } from 'expo-av';
 
 // Define proper interface for server response
 interface AnalysisResult {
@@ -99,6 +101,47 @@ export default function FormDetectionScreen() {
     
     checkPermission();
   }, [permission, requestPermission]);
+  // Add this to your component's useEffect section
+  // Initialize audio
+  useEffect(() => {
+    const initAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (error) {
+        console.error('Failed to initialize audio:', error);
+      }
+    };
+    
+    initAudio();
+  }, []);
+  
+  // Add this effect to speak the exercise introduction when it changes
+  useEffect(() => {
+    const speakIntroduction = async () => {
+      const introMessage = tts.getExerciseIntroMessage(selectedExercise);
+      await tts.speakText(introMessage, true); // Force play the introduction
+    };
+    
+    speakIntroduction();
+  }, [selectedExercise]);
+  
+  // Add this effect for periodic motivational messages
+  useEffect(() => {
+    if (!isContinuousProcessing) return;
+    
+    // Send motivational message every 30 seconds
+    const motivationInterval = setInterval(async () => {
+      const message = tts.getMotivationalMessage(selectedExercise);
+      await tts.speakText(message);
+    }, 30000);
+    
+    return () => clearInterval(motivationInterval);
+  }, [isContinuousProcessing, selectedExercise]);
   
   // Toggle camera processing
   const toggleCameraProcessing = () => {
@@ -226,8 +269,12 @@ export default function FormDetectionScreen() {
     
     // Check if we received a direct feedback message (new format)
     if ('feedback' in result) {
-      setFeedback(result.feedback as string);
+      const feedbackMessage = result.feedback as string;
+      setFeedback(feedbackMessage);
       setFeedbackType('error'); // Assuming direct feedback is usually an error/warning
+      
+      // Speak the feedback
+      tts.speakText(feedbackMessage);
       
       // Clear feedback after 3 seconds
       setTimeout(() => {
@@ -243,12 +290,21 @@ export default function FormDetectionScreen() {
     
     // Update counter if needed
     if (count_rep) {
-      setCounter(prev => prev + 1);
+      setCounter(prev => {
+        const newCount = prev + 1;
+        // Add rep count voice feedback
+        if(newCount%3==0){
+          tts.speakText(`That's rep number ${newCount}. Great job!`);
+        }
+        return newCount;
+      });
     }
     
     // Update current stage if needed
     if (stage && stage !== currentStage) {
       setCurrentStage(stage);
+      // Add stage change voice feedback
+      tts.speakText(`Moving to ${stage} position. Good form!`);
     }
     
     // Update feedback if provided
@@ -260,6 +316,9 @@ export default function FormDetectionScreen() {
         setFeedbackType('info');
       }
       
+      // Speak the feedback
+      tts.speakText(form_feedback);
+      
       // Clear feedback after 3 seconds
       setTimeout(() => {
         setFeedback('');
@@ -267,11 +326,15 @@ export default function FormDetectionScreen() {
     }
   };
   
-  // Select exercise from dropdown
+  // Update the selectExercise function to announce the change
   const selectExercise = (exercise: string) => {
     setSelectedExercise(exercise);
     setShowExerciseDropdown(false);
     setCounter(0); // Reset counter when changing exercise
+    
+    // Announce the exercise change
+    const message = tts.getExerciseIntroMessage(exercise);
+    tts.speakText(message, true); // Force play the introduction
   };
   
   // Reset counter
