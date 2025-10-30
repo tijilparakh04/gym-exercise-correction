@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { Search, UserPlus, X, Check, Users, ArrowLeft } from 'lucide-react-native';
+import { Search, UserPlus, X, Check, Users, ArrowLeft, Trophy, Medal } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { LineChart } from 'react-native-chart-kit';
 
 type FriendRequest = {
   id: string;
@@ -35,9 +36,34 @@ type UserProfile = {
   fitness_goal?: string;
 };
 
+interface LeaderboardEntry {
+  id: string;
+  user_id: string;
+  period: string;
+  score_type: string;
+  score: number;
+  rank: number;
+  profiles: {
+    id: string;
+    full_name: string;
+    profile_image_url: string | null;
+  };
+}
+
+const screenWidth = Dimensions.get('window').width;
+
+const chartConfig = {
+  backgroundGradientFrom: 'white',
+  backgroundGradientTo: 'white',
+  color: (opacity = 1) => `rgba(90, 156, 255, ${opacity})`,
+  strokeWidth: 2,
+  barPercentage: 0.5,
+  useShadowColorFromDataset: false,
+};
+
 export default function SocialScreen() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'leaderboard'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -46,12 +72,15 @@ export default function SocialScreen() {
   const [friends, setFriends] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFriend, setSelectedFriend] = useState<UserProfile | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<'weekly' | 'monthly' | 'all_time'>('weekly');
 
   useEffect(() => {
     if (user) {
       fetchFriendData();
+      fetchLeaderboard();
     }
-  }, [user]);
+  }, [user, leaderboardPeriod]);
 
   const fetchFriendData = async () => {
     try {
@@ -266,6 +295,20 @@ export default function SocialScreen() {
     }
   };
 
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/leaderboard/${leaderboardPeriod}`);
+      if (response.ok) {
+        const data = await response.json();
+        setLeaderboard(data);
+      } else {
+        console.error('Error loading leaderboard');
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error);
+    }
+  };
+
   const viewFriendProfile = async (friendId: string) => {
     try {
       const { data, error } = await supabase
@@ -275,7 +318,7 @@ export default function SocialScreen() {
         .single();
 
       if (error) throw error;
-      
+
       setSelectedFriend(data);
     } catch (error) {
       console.error('Error fetching friend profile:', error);
@@ -406,6 +449,15 @@ export default function SocialScreen() {
             Requests {incomingRequests.length > 0 && `(${incomingRequests.length})`}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'leaderboard' && styles.activeTab]}
+          onPress={() => setActiveTab('leaderboard')}
+        >
+          <Trophy size={20} color={activeTab === 'leaderboard' ? 'white' : Colors.background.lightGray} />
+          <Text style={[styles.tabText, activeTab === 'leaderboard' && styles.activeTabText]}>
+            Leaderboard
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search Results */}
@@ -492,28 +544,28 @@ export default function SocialScreen() {
               {incomingRequests.map((request) => {
                 const requesterData = request.requester;
                 if (!requesterData) return null;
-                
+
                 return (
                   <View key={request.id} style={styles.userCard}>
-                    <Image 
-                      source={{ 
+                    <Image
+                      source={{
                         uri: getImageUrl(requesterData.profile_image_url || undefined)
-                          
+
                       }}
-                      style={styles.userImage} 
+                      style={styles.userImage}
                     />
                     <View style={styles.userInfo}>
                       <Text style={styles.userName}>{requesterData.full_name}</Text>
                       <Text style={styles.userStatus}>Wants to be your friend</Text>
                     </View>
                     <View style={styles.requestActions}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.acceptButton}
                         onPress={() => respondToRequest(request.id, 'accepted')}
                       >
                         <Check size={20} color="white" />
                       </TouchableOpacity>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.rejectButton}
                         onPress={() => respondToRequest(request.id, 'rejected')}
                       >
@@ -525,27 +577,27 @@ export default function SocialScreen() {
               })}
             </View>
           )}
-          
+
           {outgoingRequests.length > 0 && (
             <View style={styles.requestsSection}>
               <Text style={styles.requestsSectionTitle}>Outgoing Requests</Text>
               {outgoingRequests.map((request) => {
                 const friendData = request.friend;
                 if (!friendData) return null;
-                
+
                 return (
                   <View key={request.id} style={styles.userCard}>
-                    <Image 
-                      source={{ 
+                    <Image
+                      source={{
                         uri: getImageUrl(friendData.profile_image_url || undefined)
                       }}
-                      style={styles.userImage} 
+                      style={styles.userImage}
                     />
                     <View style={styles.userInfo}>
                       <Text style={styles.userName}>{friendData.full_name}</Text>
                       <Text style={styles.userStatus}>Request pending</Text>
                     </View>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.cancelButton}
                       onPress={() => cancelRequest(request.id)}
                     >
@@ -556,12 +608,100 @@ export default function SocialScreen() {
               })}
             </View>
           )}
-          
+
           {incomingRequests.length === 0 && outgoingRequests.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>No friend requests</Text>
               <Text style={styles.emptyStateSubtext}>
                 Search for users to send friend requests
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Leaderboard Tab */}
+      {activeTab === 'leaderboard' && (
+        <View style={styles.leaderboardContainer}>
+          <View style={styles.leaderboardHeader}>
+            <Text style={styles.leaderboardTitle}>Fitness Leaderboard</Text>
+            <View style={styles.periodSelector}>
+              <TouchableOpacity
+                style={[styles.periodButton, leaderboardPeriod === 'weekly' && styles.activePeriodButton]}
+                onPress={() => setLeaderboardPeriod('weekly')}
+              >
+                <Text style={[styles.periodButtonText, leaderboardPeriod === 'weekly' && styles.activePeriodButtonText]}>
+                  Weekly
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.periodButton, leaderboardPeriod === 'monthly' && styles.activePeriodButton]}
+                onPress={() => setLeaderboardPeriod('monthly')}
+              >
+                <Text style={[styles.periodButtonText, leaderboardPeriod === 'monthly' && styles.activePeriodButtonText]}>
+                  Monthly
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.periodButton, leaderboardPeriod === 'all_time' && styles.activePeriodButton]}
+                onPress={() => setLeaderboardPeriod('all_time')}
+              >
+                <Text style={[styles.periodButtonText, leaderboardPeriod === 'all_time' && styles.activePeriodButtonText]}>
+                  All Time
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {leaderboard.length > 0 ? (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {leaderboard.map((entry, index) => (
+                <View key={entry.id} style={styles.leaderboardEntry}>
+                  <View style={styles.rankContainer}>
+                    {entry.rank <= 3 ? (
+                      <View style={[
+                        styles.rankBadge,
+                        entry.rank === 1 && styles.goldBadge,
+                        entry.rank === 2 && styles.silverBadge,
+                        entry.rank === 3 && styles.bronzeBadge
+                      ]}>
+                        <Text style={styles.rankText}>{entry.rank}</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.rankNumber}>#{entry.rank}</Text>
+                    )}
+                  </View>
+
+                  <Image
+                    source={{
+                      uri: getImageUrl(entry.profiles?.profile_image_url || undefined)
+                    }}
+                    style={styles.leaderboardImage}
+                  />
+
+                  <View style={styles.leaderboardInfo}>
+                    <Text style={styles.leaderboardName}>
+                      {entry.profiles?.full_name || 'Unknown User'}
+                    </Text>
+                    <Text style={styles.leaderboardScore}>
+                      {entry.score} workouts
+                    </Text>
+                  </View>
+
+                  {entry.user_id === user?.id && (
+                    <View style={styles.currentUserBadge}>
+                      <Text style={styles.currentUserText}>You</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyState}>
+              <Trophy size={48} color={Colors.background.lightGray} />
+              <Text style={styles.emptyStateText}>No leaderboard data yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Start working out to appear on the leaderboard!
               </Text>
             </View>
           )}
@@ -630,6 +770,112 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     gap: 8,
+  },
+  leaderboardContainer: {
+    padding: 20,
+    flex: 1,
+  },
+  leaderboardHeader: {
+    marginBottom: 20,
+  },
+  leaderboardTitle: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 24,
+    color: Colors.secondary.charcoal,
+    marginBottom: 16,
+  },
+  periodSelector: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  periodButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  activePeriodButton: {
+    backgroundColor: Colors.primary.blue,
+  },
+  periodButtonText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    color: Colors.background.lightGray,
+  },
+  activePeriodButtonText: {
+    color: 'white',
+  },
+  leaderboardEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  rankContainer: {
+    width: 40,
+    alignItems: 'center',
+  },
+  rankBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  goldBadge: {
+    backgroundColor: '#FFD700',
+  },
+  silverBadge: {
+    backgroundColor: '#C0C0C0',
+  },
+  bronzeBadge: {
+    backgroundColor: '#CD7F32',
+  },
+  rankText: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 16,
+    color: 'white',
+  },
+  rankNumber: {
+    fontFamily: 'Montserrat-Bold',
+    fontSize: 18,
+    color: Colors.primary.blue,
+  },
+  leaderboardImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 16,
+  },
+  leaderboardInfo: {
+    flex: 1,
+  },
+  leaderboardName: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    color: Colors.secondary.charcoal,
+  },
+  leaderboardScore: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: Colors.background.lightGray,
+  },
+  currentUserBadge: {
+    backgroundColor: Colors.primary.blue,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  currentUserText: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 12,
+    color: 'white',
   },
   activeTab: {
     backgroundColor: Colors.primary.blue,

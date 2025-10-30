@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { LineChart } from 'react-native-chart-kit';
-import { Calendar, TrendingUp, Scale, Target } from 'lucide-react-native';
+import { Calendar, TrendingUp, Scale, Target, Trophy, Award } from 'lucide-react-native';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabase';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -15,30 +17,129 @@ const chartConfig = {
   useShadowColorFromDataset: false,
 };
 
-const weightData = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-  datasets: [
-    {
-      data: [60, 62, 62, 64, 65, 65],
-      color: (opacity = 1) => `rgba(90, 156, 255, ${opacity})`,
-      strokeWidth: 2,
-    },
-  ],
-};
+interface ProgressSummary {
+  workouts: {
+    total: number;
+    this_week: number;
+    this_month: number;
+    total_duration_minutes: number;
+    total_calories_burned: number;
+    total_weight_lifted_kg: number;
+  };
+  weight: {
+    current_kg: number | null;
+    starting_kg: number | null;
+    change_kg: number;
+    logs_count: number;
+  };
+  achievements: {
+    badges_earned: number;
+  };
+}
 
-const strengthData = {
-  labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-  datasets: [
-    {
-      data: [60, 65, 67,69,70,72],
-      color: (opacity = 1) => `rgba(136, 192, 164, ${opacity})`,
-      strokeWidth: 2,
-    },
-  ],
-};
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  icon_url: string | null;
+  category: string;
+  points: number;
+  rarity: string;
+  earned_at: string;
+}
+
+interface ChartData {
+  labels: string[];
+  datasets: Array<{
+    data: number[];
+    color: (opacity?: number) => string;
+    strokeWidth: number;
+  }>;
+}
 
 export default function ProgressScreen() {
-  const [activeMetric, setActiveMetric] = useState<'weight' | 'strength'>('weight');
+  const { user } = useAuth();
+  const [activeMetric, setActiveMetric] = useState<'weight' | 'workouts'>('weight');
+  const [progressSummary, setProgressSummary] = useState<ProgressSummary | null>(null);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  const [chartData, setChartData] = useState<ChartData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      loadProgressData();
+    }
+  }, [user, activeMetric]);
+
+  const loadProgressData = async () => {
+    try {
+      setLoading(true);
+
+      // Load progress summary from API
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/progress/${user?.id}/summary`);
+      if (response.ok) {
+        const summary = await response.json();
+        setProgressSummary(summary);
+      } else {
+        console.error('Error loading progress summary');
+      }
+
+      // Load badges from API
+      const badgesResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/profile/${user?.id}/badges`);
+      if (badgesResponse.ok) {
+        const badgesData = await badgesResponse.json();
+        const formattedBadges: Badge[] = badgesData.map((item: any) => ({
+          id: item.id,
+          name: item.badges?.name || 'Unknown Badge',
+          description: item.badges?.description || '',
+          icon_url: item.badges?.icon_url,
+          category: item.badges?.category || '',
+          points: item.badges?.points || 0,
+          rarity: item.badges?.rarity || 'common',
+          earned_at: item.earned_at,
+        }));
+        setBadges(formattedBadges);
+      } else {
+        console.error('Error loading badges');
+      }
+
+      // Load chart data from API
+      const chartResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/progress/${user?.id}/chart/${activeMetric}`);
+      if (chartResponse.ok) {
+        const chartDataResponse = await chartResponse.json();
+        const labels = chartDataResponse.map((item: any) => item.date);
+        const values = chartDataResponse.map((item: any) => item.value);
+
+        setChartData({
+          labels,
+          datasets: [{
+            data: values,
+            color: (opacity = 1) => activeMetric === 'weight'
+              ? `rgba(90, 156, 255, ${opacity})`
+              : `rgba(136, 192, 164, ${opacity})`,
+            strokeWidth: 2,
+          }],
+        });
+      } else {
+        console.error('Error loading chart data');
+      }
+    } catch (error) {
+      console.error('Error loading progress data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary.blue} />
+        <Text style={{ marginTop: 16, fontFamily: 'Inter-Regular', color: Colors.secondary.charcoal }}>
+          Loading progress data...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -55,73 +156,111 @@ export default function ProgressScreen() {
           <Scale size={24} color="white" />
           <View>
             <Text style={styles.metricLabel}>Current Weight</Text>
-            <Text style={styles.metricValue}>65 kg</Text>
+            <Text style={styles.metricValue}>
+              {progressSummary?.weight.current_kg ? `${progressSummary.weight.current_kg} kg` : 'Not set'}
+            </Text>
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.metricCard, { backgroundColor: Colors.primary.green }]}
-          onPress={() => setActiveMetric('strength')}
+          onPress={() => setActiveMetric('workouts')}
         >
           <TrendingUp size={24} color="white" />
           <View>
-            <Text style={styles.metricLabel}>Strength Progress</Text>
-            <Text style={styles.metricValue}>+25%</Text>
+            <Text style={styles.metricLabel}>Workouts This Week</Text>
+            <Text style={styles.metricValue}>{progressSummary?.workouts.this_week || 0}</Text>
           </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>
-          {activeMetric === 'weight' ? 'Weight Progress' : 'Strength Progress'}
+          {activeMetric === 'weight' ? 'Weight Progress' : 'Workout Progress'}
         </Text>
-        <LineChart
-          data={activeMetric === 'weight' ? weightData : strengthData}
-          width={screenWidth - 40}
-          height={220}
-          chartConfig={chartConfig}
-          bezier
-          style={styles.chart}
-        />
+        {chartData && chartData.datasets[0].data.length > 0 ? (
+          <LineChart
+            data={chartData}
+            width={screenWidth - 40}
+            height={220}
+            chartConfig={chartConfig}
+            bezier
+            style={styles.chart}
+          />
+        ) : (
+          <View style={[styles.chart, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ fontFamily: 'Inter-Regular', color: Colors.background.lightGray }}>
+              No data available yet. Start logging your {activeMetric === 'weight' ? 'weight' : 'workouts'}!
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.goalsContainer}>
-        <Text style={styles.sectionTitle}>Current Goals</Text>
+        <Text style={styles.sectionTitle}>Current Stats</Text>
         <View style={styles.goalCard}>
           <Target size={24} color={Colors.primary.blue} />
           <View style={styles.goalInfo}>
-            <Text style={styles.goalTitle}>Weight Goal</Text>
-            <Text style={styles.goalProgress}>75 kg (10 kg to go)</Text>
+            <Text style={styles.goalTitle}>Total Workouts</Text>
+            <Text style={styles.goalProgress}>{progressSummary?.workouts.total || 0} completed</Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '80%' }]} />
+            <View style={[styles.progressFill, { width: '100%' }]} />
           </View>
         </View>
 
         <View style={styles.goalCard}>
           <Calendar size={24} color={Colors.primary.green} />
           <View style={styles.goalInfo}>
-            <Text style={styles.goalTitle}>Workout Frequency</Text>
-            <Text style={styles.goalProgress}>4/5 workouts this week</Text>
+            <Text style={styles.goalTitle}>This Month</Text>
+            <Text style={styles.goalProgress}>{progressSummary?.workouts.this_month || 0} workouts</Text>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: '80%', backgroundColor: Colors.primary.green }]} />
+            <View style={[styles.progressFill, { width: `${Math.min((progressSummary?.workouts.this_month || 0) / 12 * 100, 100)}%`, backgroundColor: Colors.primary.green }]} />
+          </View>
+        </View>
+
+        <View style={styles.goalCard}>
+          <TrendingUp size={24} color="#FF9500" />
+          <View style={styles.goalInfo}>
+            <Text style={styles.goalTitle}>Weight Change</Text>
+            <Text style={styles.goalProgress}>
+              {progressSummary?.weight.change_kg ? `${progressSummary.weight.change_kg > 0 ? '+' : ''}${progressSummary.weight.change_kg} kg` : 'No change'}
+            </Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: '50%', backgroundColor: '#FF9500' }]} />
           </View>
         </View>
       </View>
 
       <View style={styles.achievementsContainer}>
-        <Text style={styles.sectionTitle}>Recent Achievements</Text>
+        <Text style={styles.sectionTitle}>Recent Badges</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.achievementsList}>
-          {['Consistent Tracker'].map((achievement, index) => (
-            <View key={index} style={styles.achievementCard}>
+          {badges.length > 0 ? badges.slice(0, 5).map((badge, index) => (
+            <View key={badge.id} style={styles.achievementCard}>
               <View style={styles.achievementIcon}>
-                <TrendingUp size={24} color={Colors.primary.blue} />
+                <Award size={24} color={
+                  badge.rarity === 'legendary' ? '#FFD700' :
+                  badge.rarity === 'epic' ? '#9370DB' :
+                  badge.rarity === 'rare' ? '#4169E1' :
+                  Colors.primary.blue
+                } />
               </View>
-              <Text style={styles.achievementTitle}>{achievement}</Text>
-              <Text style={styles.achievementDate}>Earned Jun 2023</Text>
+              <Text style={styles.achievementTitle}>{badge.name}</Text>
+              <Text style={styles.achievementDate}>
+                {new Date(badge.earned_at).toLocaleDateString()}
+              </Text>
             </View>
-          ))}
+          )) : (
+            <View style={styles.achievementCard}>
+              <View style={styles.achievementIcon}>
+                <Trophy size={24} color={Colors.background.lightGray} />
+              </View>
+              <Text style={styles.achievementTitle}>No badges yet</Text>
+              <Text style={styles.achievementDate}>Keep working out!</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
     </ScrollView>
