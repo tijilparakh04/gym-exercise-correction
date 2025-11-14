@@ -52,6 +52,8 @@ interface LeaderboardEntry {
 
 const screenWidth = Dimensions.get('window').width;
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
 const chartConfig = {
   backgroundGradientFrom: 'white',
   backgroundGradientTo: 'white',
@@ -294,18 +296,67 @@ export default function SocialScreen() {
       Alert.alert('Error', 'Failed to cancel friend request');
     }
   };
-
   const fetchLeaderboard = async () => {
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/leaderboard/${leaderboardPeriod}`);
-      if (response.ok) {
-        const data = await response.json();
-        setLeaderboard(data);
-      } else {
-        console.error('Error loading leaderboard');
+      setLoading(true);
+
+      let startDate: Date;
+      const endDate: Date = new Date();
+
+      switch (leaderboardPeriod) {
+        case 'weekly':
+          startDate = new Date();
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case 'monthly':
+          startDate = new Date();
+          startDate.setMonth(startDate.getMonth() - 1);
+          break;
+        default:
+          startDate = new Date('2020-01-01');
       }
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
+
+      const { data: workoutData, error } = await supabase
+        .from('workout_logs')
+        .select(`
+          user_id,
+          completed_at,
+          profiles:user_id (
+            id,
+            full_name,
+            profile_image_url
+          )
+        `)
+        .gte('completed_at', startDate.toISOString())
+        .lte('completed_at', endDate.toISOString());
+
+      if (error) throw error;
+
+      const counts: Record<string, { count: number; profiles: any }> = {};
+      (workoutData ?? []).forEach((w: any) => {
+        const uid = w.user_id;
+        counts[uid] ??= { count: 0, profiles: w.profiles };
+        counts[uid].count += 1;
+      });
+
+      const leaderboardArr: LeaderboardEntry[] = Object.entries(counts)
+        .map(([uid, data]) => ({
+          id: uid,
+          user_id: uid,
+          period: leaderboardPeriod,
+          score_type: 'workouts',
+          score: data.count,
+          rank: 0,
+          profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+      setLeaderboard(leaderboardArr);
+    } catch (err) {
+      console.error('Error fetching leaderboard:', err);
+    } finally {
+      setLoading(false);
     }
   };
 

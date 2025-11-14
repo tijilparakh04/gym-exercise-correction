@@ -20,6 +20,9 @@
     - Add policies for authenticated access
 */
 
+-- Enable pgcrypto for gen_random_uuid
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Create weight_logs table
 CREATE TABLE weight_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

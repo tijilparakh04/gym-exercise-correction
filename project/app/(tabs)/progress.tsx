@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Activ
 import { Colors } from '@/constants/Colors';
 import { LineChart } from 'react-native-chart-kit';
 import { Calendar, TrendingUp, Scale, Target, Trophy, Award } from 'lucide-react-native';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 const screenWidth = Dimensions.get('window').width;
@@ -57,6 +57,9 @@ interface ChartData {
   }>;
 }
 
+// Add a robust API base URL fallback for emulator/simulator
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
 export default function ProgressScreen() {
   const { user } = useAuth();
   const [activeMetric, setActiveMetric] = useState<'weight' | 'workouts'>('weight');
@@ -71,57 +74,122 @@ export default function ProgressScreen() {
     }
   }, [user, activeMetric]);
 
+  // Replace backend fetches with direct Supabase queries
   const loadProgressData = async () => {
     try {
       setLoading(true);
+      if (!user?.id) return;
 
-      // Load progress summary from API
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/progress/${user?.id}/summary`);
-      if (response.ok) {
-        const summary = await response.json();
-        setProgressSummary(summary);
-      } else {
-        console.error('Error loading progress summary');
-      }
+      // 1) Workout stats from workout_logs
+      const { data: workoutLogs, error: workoutError } = await supabase
+        .from('workout_logs')
+        .select('duration_minutes, calories_burned, total_weight_lifted_kg, completed_at')
+        .eq('user_id', user.id);
 
-      // Load badges from API
-      const badgesResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/profile/${user?.id}/badges`);
-      if (badgesResponse.ok) {
-        const badgesData = await badgesResponse.json();
-        const formattedBadges: Badge[] = badgesData.map((item: any) => ({
-          id: item.id,
-          name: item.badges?.name || 'Unknown Badge',
-          description: item.badges?.description || '',
-          icon_url: item.badges?.icon_url,
-          category: item.badges?.category || '',
-          points: item.badges?.points || 0,
-          rarity: item.badges?.rarity || 'common',
-          earned_at: item.earned_at,
+      if (workoutError) throw workoutError;
+
+      const total = workoutLogs?.length ?? 0;
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(startOfWeek.getDate() - 7);
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const this_week = (workoutLogs ?? []).filter(w => new Date(w.completed_at) >= startOfWeek).length;
+      const this_month = (workoutLogs ?? []).filter(w => new Date(w.completed_at) >= startOfMonth).length;
+      const total_duration_minutes = (workoutLogs ?? []).reduce((sum, w) => sum + (w.duration_minutes ?? 0), 0);
+      const total_calories_burned = (workoutLogs ?? []).reduce((sum, w) => sum + (w.calories_burned ?? 0), 0);
+      const total_weight_lifted_kg = (workoutLogs ?? []).reduce((sum, w) => sum + (w.total_weight_lifted_kg ?? 0), 0);
+
+      // 2) Weight progress from weight_logs
+      const { data: weightLogs, error: weightError } = await supabase
+        .from('weight_logs')
+        .select('weight_kg, logged_at')
+        .eq('user_id', user.id)
+        .order('logged_at', { ascending: true });
+
+      if (weightError) throw weightError;
+
+      const starting_kg = weightLogs?.[0]?.weight_kg ?? null;
+      const current_kg = weightLogs && weightLogs.length > 0 ? weightLogs[weightLogs.length - 1].weight_kg : null;
+      const change_kg = current_kg != null && starting_kg != null ? Number((current_kg - starting_kg).toFixed(1)) : 0;
+
+      // 3) Achievements: count of user_badges
+      const { count: badgesCount, error: badgeError } = await supabase
+        .from('user_badges')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (badgeError) throw badgeError;
+
+      setProgressSummary({
+        workouts: {
+          total,
+          this_week,
+          this_month,
+          total_duration_minutes,
+          total_calories_burned,
+          total_weight_lifted_kg,
+        },
+        weight: {
+          current_kg,
+          starting_kg,
+          change_kg,
+          logs_count: weightLogs?.length ?? 0,
+        },
+        achievements: {
+          badges_earned: badgesCount ?? 0,
+        },
+      });
+
+      // 4) Optional: badges listing from badges table
+      const { data: badgesData } = await supabase
+        .from('badges')
+        .select('*')
+        .order('points', { ascending: false });
+
+      if (badgesData) {
+        const formattedBadges: Badge[] = badgesData.map((b: any) => ({
+          id: b.id,
+          name: b.name || 'Unknown Badge',
+          description: b.description || '',
+          icon_url: b.icon_url ?? null,
+          category: b.category || '',
+          points: b.points || 0,
+          rarity: b.rarity || 'common',
+          earned_at: b.created_at || new Date().toISOString(),
         }));
         setBadges(formattedBadges);
-      } else {
-        console.error('Error loading badges');
       }
 
-      // Load chart data from API
-      const chartResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/progress/${user?.id}/chart/${activeMetric}`);
-      if (chartResponse.ok) {
-        const chartDataResponse = await chartResponse.json();
-        const labels = chartDataResponse.map((item: any) => item.date);
-        const values = chartDataResponse.map((item: any) => item.value);
+      // 5) Chart data (client-side)
+      if (activeMetric === 'workouts') {
+        const groups: Record<string, { workouts: number }> = {};
+        (workoutLogs ?? []).forEach(w => {
+          const d = new Date(w.completed_at);
+          const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+          groups[key] = { workouts: (groups[key]?.workouts ?? 0) + 1 };
+        });
+        const sorted = Object.entries(groups).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        const last7 = sorted.slice(-7);
 
         setChartData({
-          labels,
+          labels: last7.map(([date]) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })),
           datasets: [{
-            data: values,
-            color: (opacity = 1) => activeMetric === 'weight'
-              ? `rgba(90, 156, 255, ${opacity})`
-              : `rgba(136, 192, 164, ${opacity})`,
+            data: last7.map(([_, v]) => v.workouts),
+            color: (opacity = 1) => `rgba(136, 192, 164, ${opacity})`,
             strokeWidth: 2,
           }],
         });
       } else {
-        console.error('Error loading chart data');
+        const lastWeights = (weightLogs ?? []).slice(-7);
+        setChartData({
+          labels: lastWeights.map(w => new Date(w.logged_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit' })),
+          datasets: [{
+            data: lastWeights.map(w => w.weight_kg),
+            color: (opacity = 1) => `rgba(90, 156, 255, ${opacity})`,
+            strokeWidth: 2,
+          }],
+        });
       }
     } catch (error) {
       console.error('Error loading progress data:', error);

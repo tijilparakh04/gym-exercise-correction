@@ -18,7 +18,10 @@
 - [x] Update project/app/(tabs)/social.tsx to include leaderboard view among friends
 - [ ] Add badge display components
 
-## 4. Testing and Validation
+## 4. Documentation
+- [x] Create a concise 1-minute explanation script covering the key changes made
+
+## 5. Testing and Validation
 - [ ] Test progress tracking functionality
 - [ ] Test leaderboard among friends
 - [ ] Test badge system

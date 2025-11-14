@@ -7,11 +7,12 @@ const router = Router();
 router.get('/:period', async (req, res) => {
   try {
     const { period } = req.params;
-    const userId = req.headers['user-id'] as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'User ID required' });
-    }
+    // Removed requirement for user-id header for public leaderboard
+    // const userId = req.headers['user-id'] as string;
+    // if (!userId) {
+    //   return res.status(401).json({ error: 'User ID required' });
+    // }
 
     let startDate: Date;
     let endDate: Date = new Date();
@@ -26,13 +27,12 @@ router.get('/:period', async (req, res) => {
         startDate.setMonth(startDate.getMonth() - 1);
         break;
       case 'all_time':
-        startDate = new Date('2020-01-01'); // Far in the past
+        startDate = new Date('2020-01-01');
         break;
       default:
         return res.status(400).json({ error: 'Invalid period' });
     }
 
-    // Get workout counts for the period
     const { data: workoutData, error: workoutError } = await supabase
       .from('workout_logs')
       .select(`
@@ -52,27 +52,25 @@ router.get('/:period', async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch leaderboard data' });
     }
 
-    // Count workouts per user
     const userWorkoutCounts: { [key: string]: { count: number; profile: any } } = {};
 
     workoutData?.forEach((workout: any) => {
-      const userId = workout.user_id;
-      if (!userWorkoutCounts[userId]) {
-        userWorkoutCounts[userId] = {
+      const uid = workout.user_id;
+      if (!userWorkoutCounts[uid]) {
+        userWorkoutCounts[uid] = {
           count: 0,
           profile: workout.profiles
         };
       }
-      userWorkoutCounts[userId].count += 1;
+      userWorkoutCounts[uid].count += 1;
     });
 
-    // Convert to array and sort by workout count
     const leaderboard = Object.entries(userWorkoutCounts)
       .map(([userId, data]) => ({
         user_id: userId,
         score: data.count,
         score_type: 'workouts',
-        rank: 0, // Will be set below
+        rank: 0,
         profiles: data.profile
       }))
       .sort((a, b) => b.score - a.score)
@@ -88,7 +86,7 @@ router.get('/:period', async (req, res) => {
   }
 });
 
-// Get user's rank in leaderboard
+// Get user's rank in leaderboard (unchanged)
 router.get('/user/:period', async (req, res) => {
   try {
     const { period } = req.params;
@@ -98,7 +96,6 @@ router.get('/user/:period', async (req, res) => {
       return res.status(401).json({ error: 'User ID required' });
     }
 
-    // First get the full leaderboard
     const leaderboardResponse = await fetch(`${req.protocol}://${req.get('host')}/api/leaderboard/${period}`, {
       headers: {
         'user-id': userId
@@ -110,8 +107,6 @@ router.get('/user/:period', async (req, res) => {
     }
 
     const leaderboard = await leaderboardResponse.json();
-
-    // Find user's position
     const userEntry = leaderboard.find((entry: any) => entry.user_id === userId);
 
     if (!userEntry) {

@@ -46,6 +46,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(5000, "0.0.0.0", () => console.log("Server running on port 5000"));
+

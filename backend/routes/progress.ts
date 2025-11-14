@@ -130,14 +130,15 @@ router.get('/:userId/chart/:type', async (req, res) => {
       if (error) return handleError(res, error);
 
       // Group by date
-      const groupedData = data.reduce((acc, log) => {
+      type GroupedEntry = { date: string; workouts: number; duration: number; calories: number };
+      const groupedData = (data as any[]).reduce<Record<string, GroupedEntry>>((acc, log) => {
         const date = new Date(log.completed_at).toISOString().split('T')[0];
         if (!acc[date]) {
           acc[date] = { date, workouts: 0, duration: 0, calories: 0 };
         }
         acc[date].workouts += 1;
-        acc[date].duration += log.duration_minutes || 0;
-        acc[date].calories += log.calories_burned || 0;
+        acc[date].duration += (log.duration_minutes as number) || 0;
+        acc[date].calories += (log.calories_burned as number) || 0;
         return acc;
       }, {});
 
