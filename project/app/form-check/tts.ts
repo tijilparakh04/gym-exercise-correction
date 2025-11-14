@@ -1,16 +1,19 @@
-import { ElevenLabsClient } from "elevenlabs";
 import * as FileSystem from 'expo-file-system';
 import { Audio } from 'expo-av';
-
-// Initialize the ElevenLabs client with the API key from env
-const client = new ElevenLabsClient({
-  apiKey: process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY,
-});
-
-// Voice IDs - you can choose different voices from your ElevenLabs dashboard
-const VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"; // Default voice
+import Constants from 'expo-constants';
 
 // Keep track of the last time audio was played to prevent spamming
+
+const GOOGLE_TTS_LANGUAGE = 'en-US';
+const GOOGLE_TTS_VOICE = 'en-US-Neural2-C'; // pick any available voice, e.g., 'en-US-Standard-C' if Neural2 not enabled
+const GOOGLE_TTS_SPEAKING_RATE = 1.0;
+const GOOGLE_TTS_PITCH = 0.0;
+
+const getGoogleTTSApiKey = (): string => {
+  const envKey = process.env.EXPO_PUBLIC_GOOGLE_TTS_API_KEY;
+  const extra = (Constants as any)?.expoConfig?.extra;
+  return envKey || extra?.EXPO_PUBLIC_GOOGLE_TTS_API_KEY || extra?.GOOGLE_TTS_API_KEY || '';
+};
 let lastAudioTime = 0;
 const AUDIO_COOLDOWN = 5000; // 5 seconds cooldown
 
@@ -22,71 +25,84 @@ let sound: Audio.Sound | null = null;
  * @param text The text to convert to speech
  * @param force Whether to force play even if within cooldown period
  */
+const getElevenLabsApiKey = (): string => {
+  const envKey = process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY;
+  const extra = (Constants as any)?.expoConfig?.extra;
+  return envKey || extra?.EXPO_PUBLIC_ELEVENLABS_API_KEY || extra?.ELEVENLABS_API_KEY || '';
+};
+
 export const speakText = async (text: string, force: boolean = false): Promise<void> => {
   try {
     const now = Date.now();
-    
+
     // Check if we're within the cooldown period
     if (!force && now - lastAudioTime < AUDIO_COOLDOWN) {
       console.log('Audio on cooldown, skipping:', text);
       return;
     }
-    
+
+    // Resolve API key for Google Cloud TTS
+    const apiKey = getGoogleTTSApiKey();
+    if (!apiKey) {
+      console.error('Google Cloud TTS API key is missing. Set EXPO_PUBLIC_GOOGLE_TTS_API_KEY or extra.GOOGLE_TTS_API_KEY.');
+      return;
+    }
+
     // Update last audio time
     lastAudioTime = now;
-    
-    console.log('Converting to speech:', text);
-    
-    // Use the TTS API to get a URL for the audio
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+
+    console.log('Converting to speech (Google Cloud TTS):', text);
+
+    // Call Google Cloud Text-to-Speech REST API
+    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'xi-api-key': process.env.EXPO_PUBLIC_ELEVENLABS_API_KEY || '',
       },
       body: JSON.stringify({
-        text,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5
+        input: { text },
+        voice: {
+          languageCode: GOOGLE_TTS_LANGUAGE,
+          name: GOOGLE_TTS_VOICE
+        },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          speakingRate: GOOGLE_TTS_SPEAKING_RATE,
+          pitch: GOOGLE_TTS_PITCH
         }
       }),
     });
-    
+
     if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+      let bodyText = '';
+      try { bodyText = await response.text(); } catch {}
+      throw new Error(`Google TTS API error: ${response.status} ${response.statusText} ${bodyText}`);
     }
-    
-    // Get the audio data as an ArrayBuffer
-    const audioData = await response.arrayBuffer();
-    
-    // Create a temporary file to store the audio
-    const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
-    
-    // Convert ArrayBuffer to Base64 string
-    const base64Audio = arrayBufferToBase64(audioData);
-    
+
+    // Parse base64 audio content from Google response
+    const data = await response.json();
+    const base64Audio = data?.audioContent;
+    if (!base64Audio) {
+      throw new Error('Google TTS API returned no audioContent.');
+    }
+
     // Write the audio data to a file
-    await FileSystem.writeAsStringAsync(
-      fileUri,
-      base64Audio,
-      { encoding: FileSystem.EncodingType.Base64 }
-    );
-    
+    const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+    await FileSystem.writeAsStringAsync(fileUri, base64Audio, { encoding: FileSystem.EncodingType.Base64 });
+
     // Unload any previous sound
     if (sound) {
       await sound.unloadAsync();
     }
-    
+
     // Load and play the audio
     const { sound: newSound } = await Audio.Sound.createAsync(
       { uri: fileUri },
       { shouldPlay: true }
     );
-    
+
     sound = newSound;
-    
+
     // Clean up after playing
     sound.setOnPlaybackStatusUpdate(async (status) => {
       if (status.isLoaded && status.didJustFinish) {
@@ -95,24 +111,11 @@ export const speakText = async (text: string, force: boolean = false): Promise<v
         await FileSystem.deleteAsync(fileUri, { idempotent: true });
       }
     });
-    
+
   } catch (error) {
     console.error('Error speaking text:', error);
   }
 };
-
-/**
- * Convert ArrayBuffer to Base64 string
- */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
 
 /**
  * Get a random motivational message

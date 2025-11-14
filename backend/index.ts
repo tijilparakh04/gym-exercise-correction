@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import profileRoutes from './routes/profile';
 import workoutRoutes from './routes/workout';
+import progressRoutes from './routes/progress';
+import leaderboardRoutes from './routes/leaderboard';
 import { config } from './config';
 
 // Add import for diet plan routes
@@ -29,6 +31,8 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/profile', profileRoutes);
 app.use('/api/workout', workoutRoutes);
+app.use('/api/progress', progressRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
 // Add diet plan routes
 app.use('/api/diet-plan', dietPlanRoutes);
 app.use('/api/workout-plan', workoutPlanRoutes);
@@ -42,6 +46,5 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+app.listen(5000, "0.0.0.0", () => console.log("Server running on port 5000"));
+

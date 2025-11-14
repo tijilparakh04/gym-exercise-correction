@@ -10,7 +10,7 @@ export const config = {
       'http://localhost:8081',
       'http://localhost:19006',
       'exp://localhost:19000',
-      'exp://192.168.1.15:19000'
+      'exp://10.24.93.144:19000'
     ]
   },
   supabase: {
